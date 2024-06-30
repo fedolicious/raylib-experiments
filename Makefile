@@ -27,6 +27,7 @@
 PROJECT_NAME       ?= alfredproject
 RAYLIB_VERSION     ?= 4.2.0
 RAYLIB_PATH        ?= C:\raylib\raylib
+MAIN_FILE          ?= project.c
 
 # Define compiler path on Windows
 COMPILER_PATH      ?= C:/raylib/w64devkit/bin
@@ -244,7 +245,7 @@ endif
 
 # Define include paths for required headers
 # NOTE: Several external required libraries (stb and others)
-INCLUDE_PATHS = -I. -I$(RAYLIB_PATH)/src -I$(RAYLIB_PATH)/src/external
+INCLUDE_PATHS = -I. -I$(RAYLIB_PATH)/src -I$(RAYLIB_PATH)/src/external -I./src
 
 # Define additional directories containing required header files
 ifeq ($(PLATFORM),PLATFORM_RPI)
@@ -354,10 +355,15 @@ endif
 # Define all source files required
 SRC_DIR = src
 OBJ_DIR = obj
+TEST_DIR = tests
 
 # Define all object files from source files
-SRC = $(wildcard $(SRC_DIR)/*.c) $(wildcard $(SRC_DIR)/*/*.c)
-OBJS = $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+MAIN_SRC = $(SRC_DIR)/$(MAIN_FILE)
+MAIN_OBJ = $(MAIN_SRC:%.c=$(OBJ_DIR)/%.o)
+TEST_SRC = $(wildcard $(TEST_DIR)/*.c) $(wildcard $(TEST_DIR)/*/*.c)
+TEST_OBJS = $(TEST_SRC:%.c=$(OBJ_DIR)/%.o)
+SRC = $(filter-out $(MAIN_SRC), $(wildcard $(SRC_DIR)/*.c) $(wildcard $(SRC_DIR)/*/*.c))
+OBJS = $(SRC:%.c=$(OBJ_DIR)/%.o)
 #OBJS ?= main.c
 
 # For Android platform we call a custom Makefile.Android
@@ -373,15 +379,29 @@ endif
 # NOTE: We call this Makefile target or Makefile.Android target
 all:
 	$(MAKE) $(MAKEFILE_PARAMS)
-
 # Project target defined by PROJECT_NAME
-$(PROJECT_NAME): $(OBJS)
-	$(CC) -o $(PROJECT_NAME)$(EXT) $(OBJS) $(CFLAGS) $(INCLUDE_PATHS) $(LDFLAGS) $(LDLIBS) -D$(PLATFORM)
+$(PROJECT_NAME): $(MAIN_OBJ) $(OBJS)
+	$(CC) -o $(PROJECT_NAME)$(EXT) $(MAIN_OBJ) $(OBJS) $(CFLAGS) $(INCLUDE_PATHS) $(LDFLAGS) $(LDLIBS) -D$(PLATFORM)
 
 # Compile source files
 # NOTE: This pattern will compile every module defined on $(OBJS)
 #%.o: %.c
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+$(OBJ_DIR)/%.o: %.c
+	mkdir -p $(@D)
+	$(CC) -c $< -o $@ $(CFLAGS) $(INCLUDE_PATHS) -D$(PLATFORM)
+
+# Test target entry
+test:
+	echo $(TEST_OBJS) $(OBJS)
+	$(MAKE) $(MAKEFILE_PARAMS)_test
+
+# Project target defined by PROJECT_NAME_test
+$(PROJECT_NAME)_test: $(TEST_OBJS) $(OBJS)
+	$(CC) -o $(PROJECT_NAME)_test$(EXT) $(TEST_OBJS) $(OBJS) $(CFLAGS) $(INCLUDE_PATHS) $(LDFLAGS) $(LDLIBS) -D$(PLATFORM)
+
+# Compile source files
+$(OBJ_DIR)/%.o: %.c
+	mkdir -p $(@D)
 	$(CC) -c $< -o $@ $(CFLAGS) $(INCLUDE_PATHS) -D$(PLATFORM)
 
 # Clean everything

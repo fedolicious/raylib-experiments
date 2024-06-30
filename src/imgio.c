@@ -32,6 +32,9 @@ int skipWhitespaceAndComments(FILE* stream) {
 image imgio_readPPM(const char* pathName) {
     image img;
     FILE* imgStream = fopen(pathName,"rb");
+    if(imgStream == NULL) {
+        perrorExit("Failed to open .ppm file", errno);
+    }
     fseek(imgStream, 0, SEEK_END);
     long fileSize = ftell(imgStream);
     fseek(imgStream, 0, SEEK_SET);
@@ -39,40 +42,40 @@ image imgio_readPPM(const char* pathName) {
     char signature[sizeof(PPM_SIGNATURE)];
     int amountRead = fread(signature, sizeof(signature), 1, imgStream);
     if(amountRead < 1 || memcmp(signature, PPM_SIGNATURE, sizeof(signature)) != 0) {
-        perrorExit("malformed .ppm file - invalid signature", -1);
+        perrorExit("Malformed .ppm file - invalid signature", -1);
     }
     skipWhitespaceAndComments(imgStream);
     
     if(fscanf(imgStream, "%d", &img.width) != 1 || img.width <= 0) {
-        perrorExit("malformed .ppm file - invalid width", -1);
+        perrorExit("Malformed .ppm file - invalid width", -1);
     }
     skipWhitespaceAndComments(imgStream);
     
     if(fscanf(imgStream, "%d", &img.height) != 1 || img.height <= 0) {
-        perrorExit("malformed .ppm file - invalid height", -1);
+        perrorExit("Malformed .ppm file - invalid height", -1);
     }
     skipWhitespaceAndComments(imgStream);
     
     int maxValue;
     if(fscanf(imgStream, "%d", &maxValue) != 1 || maxValue != PPM_VALUE_MAX) {
-        perrorExit("malformed .ppm file - invalid max colour value", -1);
+        perrorExit("Malformed .ppm file - invalid max colour value", -1);
     }
     
     if(getc(imgStream) != '\n') {
-        perrorExit("malformed .ppm file - no newline between header and data", -1);   
+        perrorExit("Malformed .ppm file - no newline between header and data", -1);   
     }
     
     long filePos = ftell(imgStream);
     long imgDataSize = (long)img.width*(long)img.height*3L;
     if(imgDataSize != fileSize-filePos) {
-        perrorExit("malformed .ppm file - invalid data size", -1);   
+        perrorExit("Malformed .ppm file - invalid data size", -1);   
     }
     
     img.pixels = malloc(imgDataSize);
     amountRead = fread(img.pixels, imgDataSize, 1, imgStream);
     //sanity check
     if(amountRead < 1 || ftell(imgStream) != fileSize || getc(imgStream) != EOF) {
-        perrorExit("error occured while reading data from .ppm file", -1);
+        perrorExit("Error occured while reading data from .ppm file", -1);
     }
     assert(fclose(imgStream) == 0);
     printf("\\n: %d, \\r: %d", '\n', '\r');

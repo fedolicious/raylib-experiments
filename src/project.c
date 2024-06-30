@@ -27,13 +27,13 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-
+#include <unistd.h>
 #include <errno.h>
 #include <assert.h>
 
 
 int main(void) {
-    
+    chdir("resources");
     // Initialization
     //--------------------------------------------------------------------------------------
     const int screenWidth = 800;
