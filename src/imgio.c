@@ -78,6 +78,5 @@ image imgio_readPPM(const char* pathName) {
         perrorExit("Error occured while reading data from .ppm file", -1);
     }
     assert(fclose(imgStream) == 0);
-    printf("\\n: %d, \\r: %d", '\n', '\r');
     return img;
 }

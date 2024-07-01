@@ -24,6 +24,7 @@
 #include "raylib.h"
 
 #include "imgio.h"
+#include "collections/prioq.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -31,6 +32,18 @@
 #include <errno.h>
 #include <assert.h>
 
+typedef struct {
+    int x;
+    int y;
+} aStarPt;
+inline void delete_ivec2(ivec2) { return; }
+ivec2 neighborOffsets[4] = {
+    {-1, 0},
+    {0, 1},
+    {1, 0},
+    {0, -1},
+};
+DEFINE_PRIOQ(aStarPt*, asp);
 
 int main(void) {
     chdir("resources");
@@ -61,6 +74,26 @@ int main(void) {
     int startY = 0;
     int endX = img.width-1;
     int endY = img.height-1;
+    //a star
+    {
+        aStarPt* graph[img.width*img.height];
+        for(int y = 0; y < img.height; y++) {
+            for(int x = 0; x < img.width; x++) {
+                graph[y*img.width+x] = (aStarPt){
+                    .x = x,
+                    .y = y,
+                }
+            }
+        }
+        prioq_asp* nodes = new_prioq_asp();
+        
+        prioq_asp_add(nodes, (aStarPt){startX, startY}, 0+abs(startX-endX)+abs(startY-endY));
+        while(nodes->len > 0) {
+            prioqElt bestNode = prioq_poll(nodes);
+        }
+        
+        delete_prioq(nodes);
+    }
 
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
@@ -79,6 +112,8 @@ int main(void) {
             ClearBackground(RAYWHITE);
             DrawText("Congrats! You created your first window!", 190, 200, 20, LIGHTGRAY);
             DrawText(str, 190, 240, 20, BLACK);
+            
+            //draw ppm
             const int imgX = 10;
             const int imgY = 10;
             const int pxWidth = 10;
@@ -93,6 +128,7 @@ int main(void) {
                     CLITERAL(Color){ pxl.r, pxl.g, pxl.b, 255 });
                 }
             }
+            //show keys pressed
             /*{
                 int numKeysPressed = 0;
                 int keys[10];
