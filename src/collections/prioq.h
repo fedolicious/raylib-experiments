@@ -1,77 +1,57 @@
 #pragma once
 
-/*
-typedef struct {
-    int x;
-    int y;
-} prioqElt;
-typedef struct {
-    prioqElt* elements;
-    int* priorities;
-    unsigned capac;
-    unsigned len;
-} prioq;
-*/
 #define DEFAULT_PRIOQ_CAPAC 8                                                            
 
-//MUST PROVIDE A void delete_##name(prioq_##name) FUNCTION
+//You must provide a void delete_##name(prioq_##name) function when using DEFINE_PRIOQ(T, name);
 #define DEFINE_PRIOQ(T, name)                                                            \
 typedef struct {                                                                         \
     T* elements;                                                                         \
-    int* priorities;                                                                     \
+    int (*compare)(T, T);                                                                \
     unsigned capac;                                                                      \
     unsigned len;                                                                        \
 } prioq_##name;                                                                          \
                                                                                          \
-prioq_##name* new_prioq_##name(void) {                                                   \
+prioq_##name* new_prioq_##name(int(*cmpFn)(T, T)) {                                      \
     prioq_##name* queue = malloc(sizeof(prioq_##name));                                  \
     *queue = (prioq_##name) {                                                            \
         .elements = malloc(DEFAULT_PRIOQ_CAPAC * sizeof(*queue->elements)),              \
-        .priorities = malloc(DEFAULT_PRIOQ_CAPAC * sizeof(*queue->priorities)),          \
+        .compare = cmpFn,                                                                \
         .capac = DEFAULT_PRIOQ_CAPAC,                                                    \
         .len = 0,                                                                        \
     };                                                                                   \
     return queue;                                                                        \
 }                                                                                        \
 void delete_prioq_##name(prioq_##name* queue) {                                          \
-    for(int i = 0; i < queue->len; i++) {                                                       \
+    for(int i = 0; i < queue->len; i++) {                                                \
         delete_##name(queue->elements[i]);                                               \
     }                                                                                    \
     free(queue->elements);                                                               \
-    free(queue->priorities);                                                             \
     free(queue);                                                                         \
 }                                                                                        \
 int prioq_setCapac(prioq_##name* queue, int capac) {                                     \
     queue->capac = capac;                                                                \
     queue->elements = realloc(queue->elements, capac * sizeof(*queue->elements));        \
     if(queue->elements == NULL) { return -1; }                                           \
-    queue->priorities = realloc(queue->priorities, capac * sizeof(*queue->priorities));  \
-    if(queue->priorities == NULL) { return -1; }                                         \
     return 0;                                                                            \
 }                                                                                        \
-int prioq_##name##_add(prioq_##name* queue, T elt, int priority) {                       \
+int prioq_##name##_add(prioq_##name* queue, T elt) {                                     \
     if(queue->len >= queue->capac) {                                                     \
         int ret = prioq_setCapac(queue, queue->capac*2);                                 \
         if(ret != 0) { return ret; }                                                     \
     }                                                                                    \
     queue->elements[queue->len] = elt;                                                   \
-    queue->priorities[queue->len] = priority;                                            \
     queue->len++;                                                                        \
     return 0;                                                                            \
 }                                                                                        \
                                                                                          \
 int prioq_removeIndex(prioq_##name* queue, int index) {                                  \
-    unsigned halfCapac = queue->capac/2;                                                 \
-    if(queue->len <= halfCapac) {                                                        \
-        int ret = prioq_setCapac(queue, halfCapac);                                      \
+    if(queue->len <= queue->capac/4) {                                                   \
+        int ret = prioq_setCapac(queue, queue->capac/2);                                 \
         if(ret != 0) { return ret; }                                                     \
     }                                                                                    \
     memmove(                                                                             \
         &queue->elements[index], &queue->elements[index+1],                              \
     (queue->len - (index+1))*sizeof(*queue->elements));                                  \
-    memmove(                                                                             \
-        &queue->priorities[index], &queue->priorities[index+1],                          \
-    (queue->len - (index+1))*sizeof(*queue->priorities));                                \
     queue->len--;                                                                        \
     return 0;                                                                            \
                                                                                          \
@@ -80,9 +60,8 @@ int prioq_peekIndex(prioq_##name* queue) {                                      
     if(queue->len == 0) { return 0; }                                                    \
     int headIndex = 0;                                                                   \
     for(int i = 1; i < queue->len; i++) {                                                \
-        if(queue->priorities[i] > queue->priorities[headIndex]) {                        \
-            headIndex = i;                                                               \
-        }                                                                                \
+        const int cmp = queue->compare(queue->elements[headIndex], queue->elements[i]);  \
+        if(cmp > 0) { headIndex = i; }                                                   \
     }                                                                                    \
     return headIndex;                                                                    \
 }                                                                                        \

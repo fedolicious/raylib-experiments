@@ -37,6 +37,7 @@ typedef struct {
     int x;
     int y;
     int gVal;
+    int cameFrom;
     bool isWall;
     bool isInPrioq;
 } aStarPt;
@@ -53,6 +54,18 @@ ivec2 neighborOffsets[4] = {
     {0, -1},
 };
 DEFINE_PRIOQ(aStarPt*, asp);
+static unsigned startX;
+static unsigned startY;
+static unsigned endX;
+static unsigned endY;
+int cmpAStarNode(aStarPt* A, aStarPt* B) {
+    const int AhVal = abs(A->x-endX)+abs(A->y-endY);
+    const int BhVal = abs(B->x-endX)+abs(B->y-endY);
+    const int AfVal = A->gVal + AhVal;
+    const int BfVal = B->gVal + BhVal;
+    return AfVal - BfVal;
+}
+#define log(...) fprintf(logStream, __VA_ARGS__); fflush(logStream)
 
 int main(void) {
     chdir("resources");
@@ -66,9 +79,7 @@ int main(void) {
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
     
-    
     FILE* logStream = fopen("log.txt", "w");
-        
     
     const int len = 10;
     char* str = malloc(len * sizeof(char));
@@ -78,13 +89,13 @@ int main(void) {
     str[len-1] = '\0';
     
     image img = imgio_readPPM("img.ppm");
-        
-    int startX = 0;
-    int startY = 0;
-    int endX = img.width-1;
-    int endY = img.height-1;
+
     //a star
     {
+        startX = 0;
+        startY = 0;
+        endX = img.width-1;
+        endY = img.height-1;
         aStarPt* graph[img.width*img.height];
         for(int y = 0; y < img.height; y++) {
             for(int x = 0; x < img.width; x++) {
@@ -98,40 +109,71 @@ int main(void) {
                 };
             }
         }
-        prioq_asp* nodes = new_prioq_asp();
-        
+        prioq_asp* nodes = new_prioq_asp(cmpAStarNode);
+
         //add first point
-        //TODO SET .isInPrioq TO TRUE
-        prioq_asp_add(nodes, (aStarPt){startX, startY}, 0+abs(startX-endX)+abs(startY-endY));
-        
+        aStarPt* start = graph[img.width*startY + startX];
+        if(start->isWall) { perrorExit("A* error - Start location is a wall", -1); }
+        if(graph[img.width*endY + endX]->isWall) { perrorExit("A* error - End location is a wall", -1); }
+        start->gVal = 0;
+        start->cameFrom = -1;
+        start->isInPrioq = true;
+        prioq_asp_add(nodes, start);
+        bool goalFound = false;
+        aStarPt* bestNode;
+        aStarPt* fakeNode = malloc(sizeof(aStarPt));
+        *fakeNode = (aStarPt){
+            .x = endX,
+            .y = endY,
+            .gVal = 0,
+        };
         while(nodes->len > 0) {
-            //TODO ADD COMPARISON FUNCTION TO PRIOQ, REMOVE .priorities FIELD
-            aStarPt* bestNode = prioq_asp_poll(nodes); //lowest gVal+heuristic
+            bestNode = prioq_asp_poll(nodes);
             bestNode->isInPrioq = false;
             if(bestNode->x == endX && bestNode->y == endY) {
+                goalFound = true;
+                break;
+                log("\nGOAL FOUND!! distance: %d\n\n",bestNode->gVal); exit(1);
                 //GOAL FOUND (return)
             }
             //check neighbors
             for(int i = 0; i < arrlen(neighborOffsets); i++) {
-                const int neighborY = bestNode->y + neighborOffsets[i].y;
                 const int neighborX = bestNode->x + neighborOffsets[i].x;
+                if(!(0 <= neighborX && neighborX < img.width)) { continue; }
+                const int neighborY = bestNode->y + neighborOffsets[i].y;
+                if(!(0 <= neighborY && neighborY < img.height)) { continue; }
                 aStarPt* neighbor = graph[img.width*neighborY + neighborX];
+                
+                
+                
                 if(neighbor->isWall || neighbor->gVal <= bestNode->gVal+1) { continue; }
-                neighbor->gVal = bestNode->gVal+1;
-                if(neighbor->isInPrioq) { continue; }
-                prioq_asp_add(neighbor);
-                //TODO RECALCULATE neighbor'S POSITION IN THE PRIOQ IF IT IS IMPLEMENTED AS A HEAP
-                neighbor->isInPrioq = true;
+                neighbor->gVal = bestNode->gVal+1;              
+                neighbor->cameFrom = img.width*bestNode->y + bestNode-> x;                                
+                if(!neighbor->isInPrioq) {
+                    prioq_asp_add(nodes, neighbor);
+                    //TODO RECALCULATE neighbor'S POSITION IN THE PRIOQ IF IT IS IMPLEMENTED AS A HEAP     
+                    neighbor->isInPrioq = true;
+                }
             }
         }
-        //if goal not found then failiure
-        
+        if(!goalFound) {
+            log("\nFAILED TO FIND GOAL\n\n"); exit(2);
+        } else {
+            aStarPt* node = bestNode;
+            while(node->cameFrom != -1) {
+                rgbAt(img, node->x, node->y).g = 64;
+                node = graph[node->cameFrom];
+            }
+        }
         delete_prioq_asp(nodes);
         for(int i = 0; i < arrlen(graph); i++) {
             free(graph[i]);
         }
     }
-
+    int imgX = 10;
+    int imgY = 10;
+    int pxWidth = 10;
+    int pxHeight = 10;
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
@@ -151,10 +193,6 @@ int main(void) {
             DrawText(str, 190, 240, 20, BLACK);
             
             //draw ppm
-            const int imgX = 10;
-            const int imgY = 10;
-            const int pxWidth = 10;
-            const int pxHeight = 10;
             for(int y = 0; y < img.height; y++) {
                 for(int x = 0; x < img.width; x++) {
                     rgb pxl = rgbAt(img, x, y);
@@ -163,8 +201,15 @@ int main(void) {
                         imgY + pxHeight*y,
                         pxWidth, pxHeight,
                     CLITERAL(Color){ pxl.r, pxl.g, pxl.b, 255 });
+                    
                 }
             }
+            if(IsKeyPressed(KEY_UP)) {imgY--;}
+            if(IsKeyPressed(KEY_DOWN)) {imgY++;}
+            if(IsKeyPressed(KEY_LEFT)) {imgX--;}
+            if(IsKeyPressed(KEY_RIGHT)) {imgX++;}
+            if(IsKeyPressed(KEY_EQUAL)) {pxWidth++; pxHeight++;}
+            if(IsKeyPressed(KEY_MINUS)) {pxWidth--; pxHeight--;}
             //show keys pressed
             /*{
                 int numKeysPressed = 0;
