@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string.h>
+
 #define DEFAULT_PRIOQ_CAPAC 8                                                            
 
 //You must provide a void delete_##name(prioq_##name) function when using DEFINE_PRIOQ(T, name);
