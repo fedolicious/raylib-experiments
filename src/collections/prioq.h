@@ -1,8 +1,9 @@
 #pragma once
 
 #include <string.h>
+#include <assert.h>
 
-#define DEFAULT_PRIOQ_CAPAC 8                                                            
+#define DEFAULT_PRIOQ_CAPAC 8
 
 //You must provide a void delete_##name(prioq_##name) function when using DEFINE_PRIOQ(T, name);
 #define DEFINE_PRIOQ(T, name)                                                            \
@@ -30,7 +31,7 @@ void delete_prioq_##name(prioq_##name* queue) {                                 
     free(queue->elements);                                                               \
     free(queue);                                                                         \
 }                                                                                        \
-int prioq_setCapac(prioq_##name* queue, int capac) {                                     \
+inline int prioq_##name##_setCapac(prioq_##name* queue, int capac) {                     \
     queue->capac = capac;                                                                \
     queue->elements = realloc(queue->elements, capac * sizeof(*queue->elements));        \
     if(queue->elements == NULL) { return -1; }                                           \
@@ -38,7 +39,7 @@ int prioq_setCapac(prioq_##name* queue, int capac) {                            
 }                                                                                        \
 int prioq_##name##_add(prioq_##name* queue, T elt) {                                     \
     if(queue->len >= queue->capac) {                                                     \
-        int ret = prioq_setCapac(queue, queue->capac*2);                                 \
+        int ret = prioq_##name##_setCapac(queue, queue->capac*2);                        \
         if(ret != 0) { return ret; }                                                     \
     }                                                                                    \
     queue->elements[queue->len] = elt;                                                   \
@@ -46,9 +47,9 @@ int prioq_##name##_add(prioq_##name* queue, T elt) {                            
     return 0;                                                                            \
 }                                                                                        \
                                                                                          \
-int prioq_removeIndex(prioq_##name* queue, int index) {                                  \
+int prioq_##name##_removeIndex(prioq_##name* queue, int index) {                         \
     if(queue->len <= queue->capac/4) {                                                   \
-        int ret = prioq_setCapac(queue, queue->capac/2);                                 \
+        int ret = prioq_##name##_setCapac(queue, queue->capac/2);                        \
         if(ret != 0) { return ret; }                                                     \
     }                                                                                    \
     memmove(                                                                             \
@@ -58,7 +59,7 @@ int prioq_removeIndex(prioq_##name* queue, int index) {                         
     return 0;                                                                            \
                                                                                          \
 }                                                                                        \
-int prioq_peekIndex(prioq_##name* queue) {                                               \
+int prioq_##name##_peekIndex(prioq_##name* queue) {                                      \
     if(queue->len == 0) { return 0; }                                                    \
     int headIndex = 0;                                                                   \
     for(int i = 1; i < queue->len; i++) {                                                \
@@ -68,11 +69,13 @@ int prioq_peekIndex(prioq_##name* queue) {                                      
     return headIndex;                                                                    \
 }                                                                                        \
 T prioq_##name##_poll(prioq_##name* queue) {                                             \
-    int headIndex = prioq_peekIndex(queue);                                              \
+    assert(queue->len > 0);                                                              \
+    int headIndex = prioq_##name##_peekIndex(queue);                                     \
     T ret = queue->elements[headIndex];                                                  \
-    prioq_removeIndex(queue, headIndex);                                                 \
+    prioq_##name##_removeIndex(queue, headIndex);                                        \
     return ret;                                                                          \
 }                                                                                        \
 T prioq_##name##_peek(prioq_##name* queue) {                                             \
-    return queue->elements[prioq_peekIndex(queue)];                                      \
+    assert(queue->len > 0);                                                              \
+    return queue->elements[prioq_##name##_peekIndex(queue)];                             \
 }

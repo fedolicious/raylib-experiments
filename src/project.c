@@ -34,54 +34,59 @@
 #include <assert.h>
 
 #define log(...) fprintf(logStream, __VA_ARGS__); fflush(logStream)
+typedef struct {
+    ivec2 pos;
+} player;
 
 int main(void) {
-    chdir("resources");
-    // Initialization
-    //--------------------------------------------------------------------------------------
+    const rgb white = (rgb){255,255,255};
+    const rgb black = (rgb){0,0,0};
     const int screenWidth = 800;
     const int screenHeight = 450;
-
     InitWindow(screenWidth, screenHeight, "raylib [core] example - basic window");
-
-    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
-    //--------------------------------------------------------------------------------------
+    SetTargetFPS(60);
+    
+    chdir("resources");
     
     FILE* logStream = fopen("log.txt", "w");
     
-    const int len = 10;
-    char* str = malloc(len * sizeof(char));
-    for(int i = 0; i < len-1; i++) {
-        str[i] = 'a'+i;
-    }
-    str[len-1] = '\0';
+    image map = imgio_readPPM("map.ppm");
     
-    image img = imgio_readPPM("img.ppm");
-    
-    path p = aStar(img, (ivec2){0, 0}, (ivec2){img.width-1, img.height-1});
-    for(int i = 0; i < p.len; i++) {
-        rgbAt(img, p.points[i].x, p.points[i].y).g = 64;
+    player player1;
+    player1 = (player) {
+        .pos.x = 46,
+        .pos.y = 22,
+    };
+    if(memcmp(&rgbAt(map, player1.pos.x, player1.pos.y), &white, sizeof(rgb)) != 0) {
+        perrorExit("Player starting location location must be open", -1);
     }
-    if(p.points != NULL) { free(p.points); }
+    
     int imgX = 10;
     int imgY = 10;
-    int pxWidth = 10;
-    int pxHeight = 10;
+    int pxWidth = 15;
+    int pxHeight = 15;
     int keysPressed[10];
     int numKeysPressed;
     // Main game loop
     while (!WindowShouldClose()) { // Detect window close button or ESC key
-        {
-            str[0]++;
-            if(str[0] > 'z') { str[0] = 'a'; }
-            
-            if(IsKeyPressed(KEY_UP)) {imgY--;}
-            if(IsKeyPressed(KEY_DOWN)) {imgY++;}
-            if(IsKeyPressed(KEY_LEFT)) {imgX--;}
-            if(IsKeyPressed(KEY_RIGHT)) {imgX++;}
+        {   
+            //zoom in/out
             if(IsKeyPressed(KEY_EQUAL)) {pxWidth++; pxHeight++;}
             if(IsKeyPressed(KEY_MINUS)) {pxWidth--; pxHeight--;}
             
+            //move player
+            ivec2 contenderPos = player1.pos;
+            if(IsKeyPressed(KEY_UP)) {contenderPos.y--;}
+            if(IsKeyPressed(KEY_DOWN)) {contenderPos.y++;}
+            if(IsKeyPressed(KEY_LEFT)) {contenderPos.x--;}
+            if(IsKeyPressed(KEY_RIGHT)) {contenderPos.x++;}
+            if(memcmp(&rgbAt(map, contenderPos.x, contenderPos.y), &white, sizeof(rgb)) == 0) {
+                player1.pos = contenderPos;
+            } else {
+                //failed to move
+            }
+            
+            //get keys pressed
             numKeysPressed = 0;
             int nextKey = GetKeyPressed();
             while(nextKey && numKeysPressed < arrlen(keysPressed)) {
@@ -94,18 +99,25 @@ int main(void) {
 
             ClearBackground(RAYWHITE);
             DrawText("Congrats! You created your first window!", 190, 200, 20, LIGHTGRAY);
-            DrawText(str, 190, 240, 20, BLACK);
             
-            //draw ppm
-            for(int y = 0; y < img.height; y++)
-            for(int x = 0; x < img.width; x++) {
-                rgb pxl = rgbAt(img, x, y);
+            //draw map
+            for(int y = 0; y < map.height; y++)
+            for(int x = 0; x < map.width; x++) {
+                rgb pxl = rgbAt(map, x, y);
                 DrawRectangle(
                     imgX + pxWidth*x,
                     imgY + pxHeight*y,
                     pxWidth, pxHeight,
                 CLITERAL(Color){ pxl.r, pxl.g, pxl.b, 255 });
             }
+            //draw player
+            DrawEllipse(
+                imgX + pxWidth*player1.pos.x + pxWidth/2,
+                imgY + pxHeight*player1.pos.y + pxHeight/2,
+                pxWidth/2,
+                pxHeight/2,
+                GREEN
+            );
             
             //show keys pressed
             for(int i = 0; i < numKeysPressed; i++) {
@@ -116,8 +128,7 @@ int main(void) {
         //----------------------------------------------------------------------------------
     }
     assert(fclose(logStream) == 0);
-    free(img.pixels);
-    free(str);
+    free(map.pixels);
 
     // De-Initialization
     //--------------------------------------------------------------------------------------

@@ -33,7 +33,17 @@ image imgio_readPPM(const char* pathName) {
     image img;
     FILE* imgStream = fopen(pathName,"rb");
     if(imgStream == NULL) {
-        perrorExit("Failed to open .ppm file", errno);
+        #define MSG_SIZE 100
+        char* errorMsg = malloc(MSG_SIZE);
+        
+        int bytesWritten = snprintf(errorMsg, MSG_SIZE, "Failed to open %s", pathName);
+        if(bytesWritten >= MSG_SIZE) {
+            free(errorMsg);
+            perrorExit("Failed to open .ppm file", errno);
+        } else {
+            perrorExit(errorMsg, errno);
+        }
+        #undef MSG_SIZE
     }
     fseek(imgStream, 0, SEEK_END);
     long fileSize = ftell(imgStream);

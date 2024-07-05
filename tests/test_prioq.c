@@ -1,10 +1,10 @@
-#include "acutest.h" //use -E -v (exec and verbose)
+#include "test_main.h"
+#define TEST_NO_MAIN
+#include "acutest.h"
+
 #include "collections/prioq.h"
 
 #include <stdbool.h>
-
-#define MY_TC(x) TEST_CHECK_(x, "%-50s", #x);
-
 
 typedef struct {
     int x;
@@ -18,7 +18,7 @@ int cmpPQE(prioqElt A, prioqElt B) {
     return -(A.priority - B.priority);
 }
 
-void test_length() {
+void test_prioq_length() {
     prioq_testType* queue = new_prioq_testType(cmpPQE);
     MY_TC(queue != NULL);
     MY_TC(0 == queue->len);
@@ -30,7 +30,7 @@ void test_length() {
     MY_TC(3 == queue->len);
     delete_prioq_testType(queue);
 }
-void test_peekAndPoll() {
+void test_prioq_peekAndPoll() {
     prioq_testType* queue = new_prioq_testType(cmpPQE);
     prioqElt ret;
     prioqElt* litPtr;
@@ -49,7 +49,7 @@ void test_peekAndPoll() {
     MY_TC(queue->len == 0);
     delete_prioq_testType(queue);
 }
-void test_priority() {
+void test_prioq_priority() {
     prioq_testType* queue = new_prioq_testType(cmpPQE);
     prioqElt ret;
     prioqElt* litPtr;
@@ -75,10 +75,3 @@ void test_priority() {
     MY_TC(queue->len == 0);
     delete_prioq_testType(queue);
 }
-
-#define tlitem(x) {#x"()", x}
-TEST_LIST = {
-    tlitem(test_length),
-    tlitem(test_peekAndPoll),
-    tlitem(test_priority),
-{NULL, NULL}};
