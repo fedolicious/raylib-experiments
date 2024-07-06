@@ -7,8 +7,7 @@
 #include <assert.h>
 
 typedef struct {
-    int x;
-    int y;
+    ivec2 pos;
     int gVal;
     int cameFrom;
     bool isWall;
@@ -26,8 +25,8 @@ ivec2 neighborOffsets[4] = {
 };
 static ivec2 stcGoal;
 int cmpAStarNode(aStarNode* A, aStarNode* B) {
-    const int AhVal = abs(A->x-stcGoal.x)+abs(A->y-stcGoal.y);
-    const int BhVal = abs(B->x-stcGoal.x)+abs(B->y-stcGoal.y);
+    const int AhVal = taxicabDist(A->pos, stcGoal);
+    const int BhVal = taxicabDist(B->pos, stcGoal);
     const int AfVal = A->gVal + AhVal;
     const int BfVal = B->gVal + BhVal;
     return AfVal - BfVal;
@@ -44,8 +43,8 @@ path aStar(const image navImg, const ivec2 start, const ivec2 goal) {
         for(int x = 0; x < navImg.width; x++) {
             graph[navImg.width*y + x] = malloc(sizeof(aStarNode));
             *graph[navImg.width*y + x] = (aStarNode){
-                .x = x,
-                .y = y,
+                .pos.x = x,
+                .pos.y = y,
                 .gVal = INT_MAX,
                 .isWall = (rgbAt(navImg, x, y).r == 0),
                 .isInPrioq = false,
@@ -69,21 +68,21 @@ path aStar(const image navImg, const ivec2 start, const ivec2 goal) {
     while(nodes->len > 0) {
         bestNode = prioq_asn_poll(nodes);
         bestNode->isInPrioq = false;
-        if(bestNode->x == goal.x && bestNode->y == goal.y) {
+        if(bestNode->pos.x == goal.x && bestNode->pos.y == goal.y) {
             goalFound = true;
             break;
         }
         //check neighbors
         for(int i = 0; i < arrlen(neighborOffsets); i++) {
-            const int neighborX = bestNode->x + neighborOffsets[i].x;
+            const int neighborX = bestNode->pos.x + neighborOffsets[i].x;
             if(!(0 <= neighborX && neighborX < navImg.width)) { continue; }
-            const int neighborY = bestNode->y + neighborOffsets[i].y;
+            const int neighborY = bestNode->pos.y + neighborOffsets[i].y;
             if(!(0 <= neighborY && neighborY < navImg.height)) { continue; }
             aStarNode* neighbor = graph[navImg.width*neighborY + neighborX];
             
             if(neighbor->isWall || neighbor->gVal <= bestNode->gVal+1) { continue; }
             neighbor->gVal = bestNode->gVal+1;              
-            neighbor->cameFrom = navImg.width*bestNode->y + bestNode-> x;                                
+            neighbor->cameFrom = navImg.width*bestNode->pos.y + bestNode->pos.x;                                
             if(!neighbor->isInPrioq) {
                 prioq_asn_add(nodes, neighbor);
                 //TODO RECALCULATE neighbor'S POSITION IN THE PRIOQ IF IT IS IMPLEMENTED AS A HEAP     
@@ -102,12 +101,12 @@ path aStar(const image navImg, const ivec2 start, const ivec2 goal) {
         };
         aStarNode* node = bestNode;
         for(int i = ret.len-1; i > 0; i--) {
-            ret.points[i].x = node->x;
-            ret.points[i].y = node->y;
+            ret.points[i].x = node->pos.x;
+            ret.points[i].y = node->pos.y;
             node = graph[node->cameFrom];
         }
-        ret.points[0].x = node->x;
-        ret.points[0].y = node->y;
+        ret.points[0].x = node->pos.x;
+        ret.points[0].y = node->pos.y;
         assert(node->cameFrom == -1);
     }
     delete_prioq_asn(nodes);

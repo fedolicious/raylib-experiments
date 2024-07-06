@@ -60,7 +60,6 @@ int prioq_##name##_removeIndex(prioq_##name* queue, int index) {                
                                                                                          \
 }                                                                                        \
 int prioq_##name##_peekIndex(prioq_##name* queue) {                                      \
-    if(queue->len == 0) { return 0; }                                                    \
     int headIndex = 0;                                                                   \
     for(int i = 1; i < queue->len; i++) {                                                \
         const int cmp = queue->compare(queue->elements[headIndex], queue->elements[i]);  \

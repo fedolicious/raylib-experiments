@@ -9,3 +9,5 @@ typedef struct {
 } ivec2;
 
 void perrorExit(const char* msg, int errorValue);
+
+int taxicabDist(const ivec2 A, const ivec2 B);

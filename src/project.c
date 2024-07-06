@@ -37,6 +37,9 @@
 typedef struct {
     ivec2 pos;
 } player;
+typedef struct {
+    ivec2 pos;
+} enemy;
 
 int main(void) {
     const rgb white = (rgb){255,255,255};
@@ -57,6 +60,11 @@ int main(void) {
         .pos.x = 46,
         .pos.y = 22,
     };
+    enemy enemyArr[2] = {
+        {.pos.x = 10, .pos.y = 27},
+        {.pos.x = 20, .pos.y = 1},
+    };
+    
     if(memcmp(&rgbAt(map, player1.pos.x, player1.pos.y), &white, sizeof(rgb)) != 0) {
         perrorExit("Player starting location location must be open", -1);
     }
@@ -69,7 +77,6 @@ int main(void) {
     int numKeysPressed;
     // Main game loop
     while (!WindowShouldClose()) { // Detect window close button or ESC key
-        {   
             //zoom in/out
             if(IsKeyPressed(KEY_EQUAL)) {pxWidth++; pxHeight++;}
             if(IsKeyPressed(KEY_MINUS)) {pxWidth--; pxHeight--;}
@@ -85,6 +92,31 @@ int main(void) {
             } else {
                 //failed to move
             }
+            //get enemy paths
+            path enemyPaths[arrlen(enemyArr)];
+            for(int i = 0; i < arrlen(enemyArr); i++) {
+                //block off nodes where other enemies are
+                for(int j = 0; j < arrlen(enemyArr); j++) {
+                    if(j != i) {
+                        rgbAt(map, enemyArr[j].pos.x, enemyArr[j].pos.y) = black;
+                    }
+                }
+                //pathfind
+                enemyPaths[i] = aStar(map, enemyArr[i].pos, player1.pos);
+                //unblock nodes
+                for(int i = 0; i < arrlen(enemyArr); i++) {
+                    rgbAt(map, enemyArr[i].pos.x, enemyArr[i].pos.y) = white;
+                }
+            }
+            //move enemies along paths
+            if(IsKeyPressed(KEY_SPACE)) {
+                for(int i = 0; i < arrlen(enemyArr); i++) {
+                    if(enemyPaths[i].len <= 2) { continue; }
+                    assert(memcmp(&enemyPaths[i].points[0], &enemyArr[i].pos, sizeof(enemyArr[i].pos)) == 0);
+                    assert(taxicabDist(enemyPaths[i].points[1], enemyArr[i].pos) == 1);
+                    enemyArr[i].pos = enemyPaths[i].points[1];
+                }
+            }
             
             //get keys pressed
             numKeysPressed = 0;
@@ -94,7 +126,7 @@ int main(void) {
                 numKeysPressed++;
                 nextKey = GetKeyPressed();
             }
-        }
+        
         BeginDrawing(); {
 
             ClearBackground(RAYWHITE);
@@ -118,6 +150,24 @@ int main(void) {
                 pxHeight/2,
                 GREEN
             );
+            //draw enemies
+            for(int i = 0; i < arrlen(enemyArr); i++) {
+                DrawEllipse(
+                    imgX + pxWidth*enemyArr[i].pos.x + pxWidth/2,
+                    imgY + pxHeight*enemyArr[i].pos.y + pxHeight/2,
+                pxWidth/2, pxHeight/2, RED);
+            }
+            //draw paths
+            for(int j = 0; j < arrlen(enemyPaths); j++)
+            for(int i = 0; i < enemyPaths[j].len-1; i++) {
+                const ivec2* pts = enemyPaths[j].points;
+                DrawLine(
+                    imgX + pxWidth*pts[i].x + pxWidth/2,
+                    imgY + pxHeight*pts[i].y + pxHeight/2,
+                    imgX + pxWidth*pts[i+1].x + pxWidth/2,
+                    imgY + pxHeight*pts[i+1].y + pxHeight/2,
+                BLUE);
+            }
             
             //show keys pressed
             for(int i = 0; i < numKeysPressed; i++) {
@@ -125,6 +175,10 @@ int main(void) {
             }
 
         } EndDrawing();
+        
+        for(int i = 0; i < arrlen(enemyPaths); i++) {
+            if(enemyPaths[i].points != NULL) { free(enemyPaths[i].points); }
+        }
         //----------------------------------------------------------------------------------
     }
     assert(fclose(logStream) == 0);
