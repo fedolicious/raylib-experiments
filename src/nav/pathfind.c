@@ -33,6 +33,7 @@ int cmpAStarNode(aStarNode* A, aStarNode* B) {
 }
 
 path aStar(const image navImg, const ivec2 start, const ivec2 goal) {
+    const path INVALID_PATH = (path) { .points = NULL, .len = INT_MAX, };
     assert(0 <= start.x && start.x < navImg.width);
     assert(0 <= start.y && start.y < navImg.height);
     assert(0 <= goal.x && goal.x < navImg.width);
@@ -57,8 +58,9 @@ path aStar(const image navImg, const ivec2 start, const ivec2 goal) {
 
     //add first point
     aStarNode* startNode = graph[navImg.width*start.y + start.x];
-    if(startNode->isWall) { perrorExit("A* error - Start location is a wall", -1); }
-    if(graph[navImg.width*goal.y + goal.x]->isWall) { perrorExit("A* error - End location is a wall", -1); }
+    if(startNode->isWall || graph[navImg.width*goal.y + goal.x]->isWall) {
+        return INVALID_PATH;
+    }
     startNode->gVal = 0;
     startNode->cameFrom = -1;
     startNode->isInPrioq = true;
@@ -92,7 +94,7 @@ path aStar(const image navImg, const ivec2 start, const ivec2 goal) {
     }
     path ret;
     if(!goalFound) {
-        ret = (path) { .points = NULL, .len = 0, };
+        ret = INVALID_PATH;
     } else {
         const int pointCount = bestNode->gVal+1;
         ret = (path) {
@@ -115,4 +117,6 @@ path aStar(const image navImg, const ivec2 start, const ivec2 goal) {
     }
     return ret;
 }
-    
+inline bool path_isValid(const path p) {
+    return p.points != NULL;
+}
