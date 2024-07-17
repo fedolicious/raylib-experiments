@@ -5,10 +5,12 @@
 
 #include <stdbool.h>
 
-typedef struct {
+struct path {
     ivec2* points;
     unsigned len;
-} path;
+    inline bool isValid() {
+        return points != NULL;
+    };
+};
 
 path aStar(const image navmesh, ivec2 start, ivec2 goal, bool isWall(const rgb));
-bool path_isValid(const path p);

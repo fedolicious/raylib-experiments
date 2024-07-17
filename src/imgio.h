@@ -1,10 +1,19 @@
 #pragma once
 
-typedef struct {
+struct rgb {
     unsigned char r;
     unsigned char g;
     unsigned char b;
-} rgb;
+    bool operator==(const rgb& other) {
+        return
+            r == other.r &&
+            g == other.g &&
+            b == other.b;
+    }
+    bool operator!=(const rgb& other) {
+        return !(*this == other);
+    }
+};
 typedef struct {
     rgb* pixels;
     unsigned width;

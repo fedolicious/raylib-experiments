@@ -15,9 +15,9 @@ typedef struct {                                                                
 } prioq_##name;                                                                          \
                                                                                          \
 prioq_##name* new_prioq_##name(int(*cmpFn)(T, T)) {                                      \
-    prioq_##name* queue = malloc(sizeof(prioq_##name));                                  \
+    prioq_##name* queue = (prioq_##name*) malloc(sizeof(prioq_##name));                  \
     *queue = (prioq_##name) {                                                            \
-        .elements = malloc(DEFAULT_PRIOQ_CAPAC * sizeof(*queue->elements)),              \
+        .elements = (T*) malloc(DEFAULT_PRIOQ_CAPAC * sizeof(*queue->elements)),         \
         .compare = cmpFn,                                                                \
         .capac = DEFAULT_PRIOQ_CAPAC,                                                    \
         .len = 0,                                                                        \
@@ -25,15 +25,15 @@ prioq_##name* new_prioq_##name(int(*cmpFn)(T, T)) {                             
     return queue;                                                                        \
 }                                                                                        \
 void delete_prioq_##name(prioq_##name* queue) {                                          \
-    for(int i = 0; i < queue->len; i++) {                                                \
+    for(unsigned i = 0; i < queue->len; i++) {                                           \
         delete_##name(queue->elements[i]);                                               \
     }                                                                                    \
     free(queue->elements);                                                               \
     free(queue);                                                                         \
 }                                                                                        \
-inline int prioq_##name##_setCapac(prioq_##name* queue, int capac) {                     \
+inline int prioq_##name##_setCapac(prioq_##name* queue, unsigned capac) {                \
     queue->capac = capac;                                                                \
-    queue->elements = realloc(queue->elements, capac * sizeof(*queue->elements));        \
+    queue->elements = (T*) realloc(queue->elements, capac * sizeof(*queue->elements));   \
     if(queue->elements == NULL) { return -1; }                                           \
     return 0;                                                                            \
 }                                                                                        \
@@ -47,21 +47,21 @@ int prioq_##name##_add(prioq_##name* queue, T elt) {                            
     return 0;                                                                            \
 }                                                                                        \
                                                                                          \
-int prioq_##name##_removeIndex(prioq_##name* queue, int index) {                         \
+int prioq_##name##_removeIndex(prioq_##name* queue, unsigned index) {                    \
     if(queue->len <= queue->capac/4) {                                                   \
         int ret = prioq_##name##_setCapac(queue, queue->capac/2);                        \
         if(ret != 0) { return ret; }                                                     \
     }                                                                                    \
     memmove(                                                                             \
         &queue->elements[index], &queue->elements[index+1],                              \
-    (queue->len - (index+1))*sizeof(*queue->elements));                                  \
+    (queue->len - (int)(index+1))*sizeof(*queue->elements));                             \
     queue->len--;                                                                        \
     return 0;                                                                            \
                                                                                          \
 }                                                                                        \
-int prioq_##name##_peekIndex(prioq_##name* queue) {                                      \
-    int headIndex = 0;                                                                   \
-    for(int i = 1; i < queue->len; i++) {                                                \
+static inline unsigned prioq_##name##_peekIndex(prioq_##name* queue) {                   \
+    unsigned headIndex = 0;                                                              \
+    for(unsigned i = 1; i < queue->len; i++) {                                           \
         const int cmp = queue->compare(queue->elements[headIndex], queue->elements[i]);  \
         if(cmp > 0) { headIndex = i; }                                                   \
     }                                                                                    \
@@ -69,7 +69,7 @@ int prioq_##name##_peekIndex(prioq_##name* queue) {                             
 }                                                                                        \
 T prioq_##name##_poll(prioq_##name* queue) {                                             \
     assert(queue->len > 0);                                                              \
-    int headIndex = prioq_##name##_peekIndex(queue);                                     \
+    unsigned headIndex = prioq_##name##_peekIndex(queue);                                \
     T ret = queue->elements[headIndex];                                                  \
     prioq_##name##_removeIndex(queue, headIndex);                                        \
     return ret;                                                                          \

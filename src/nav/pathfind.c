@@ -42,10 +42,9 @@ path aStar(const image navImg, const ivec2 start, const ivec2 goal, bool isWall(
     aStarNode* graph[navImg.width*navImg.height];
     for(int y = 0; y < navImg.height; y++) {
         for(int x = 0; x < navImg.width; x++) {
-            graph[navImg.width*y + x] = malloc(sizeof(aStarNode));
-            *graph[navImg.width*y + x] = (aStarNode){
-                .pos.x = x,
-                .pos.y = y,
+            graph[navImg.width*y + x] = (aStarNode*) malloc(sizeof(aStarNode));
+            *graph[navImg.width*y + x] = {
+                .pos = {x,y},
                 .gVal = INT_MAX,
                 .isWall = isWall(rgbAt(navImg, x, y)),
                 .isInPrioq = false,
@@ -98,7 +97,7 @@ path aStar(const image navImg, const ivec2 start, const ivec2 goal, bool isWall(
     } else {
         const int pointCount = bestNode->gVal+1;
         ret = (path) {
-            .points = malloc(pointCount * sizeof(*ret.points)),
+            .points = (ivec2*) malloc(pointCount * sizeof(*ret.points)),
             .len = pointCount,
         };
         aStarNode* node = bestNode;
@@ -116,7 +115,4 @@ path aStar(const image navImg, const ivec2 start, const ivec2 goal, bool isWall(
         free(graph[i]);
     }
     return ret;
-}
-inline bool path_isValid(const path p) {
-    return p.points != NULL;
 }

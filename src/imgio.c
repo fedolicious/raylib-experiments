@@ -9,7 +9,7 @@
 #include <ctype.h>
 #include <assert.h>
 
-const char PPM_SIGNATURE[2] = "P6";
+const char PPM_SIGNATURE[2]{'P','6'};
 #define PPM_VALUE_MAX 255
 
 //returns the first character that would be read from the stream
@@ -34,7 +34,7 @@ image imgio_readPPM(const char* pathName) {
     FILE* imgStream = fopen(pathName,"rb");
     if(imgStream == NULL) {
         #define MSG_SIZE 100
-        char* errorMsg = malloc(MSG_SIZE);
+        char* errorMsg = (char*) malloc(MSG_SIZE);
         
         int bytesWritten = snprintf(errorMsg, MSG_SIZE, "Failed to open %s", pathName);
         if(bytesWritten >= MSG_SIZE) {
@@ -81,7 +81,7 @@ image imgio_readPPM(const char* pathName) {
         perrorExit("Malformed .ppm file - invalid data size", -1);   
     }
     
-    img.pixels = malloc(imgDataSize);
+    img.pixels = (rgb*) malloc(imgDataSize);
     amountRead = fread(img.pixels, imgDataSize, 1, imgStream);
     //sanity check
     if(amountRead < 1 || ftell(imgStream) != fileSize || getc(imgStream) != EOF) {

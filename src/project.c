@@ -37,18 +37,22 @@
 typedef struct {
     ivec2 pos;
 } player;
-typedef struct {
+struct enemy {
     ivec2 pos;
     int stunTimer;
-} enemy;
+    enemy(ivec2 p) :
+        pos{p},
+        stunTimer{0}
+    {}
+};
 typedef struct {
     ivec2 pos;
 } collectible;
 ivec2 randomLocation(const image graph, const rgb locationType, const int locations) {
 
     int index = GetRandomValue(0, locations-1);
-    for(int i = 0; i < graph.width*graph.height; i++) {
-        if(!structeq(graph.pixels[i], locationType)) { continue; }
+    for(unsigned i = 0; i < graph.width*graph.height; i++) {
+        if(graph.pixels[i] != locationType) { continue; }
         if(index == 0) { 
             return (ivec2) {
                 .x = i%graph.width,
@@ -79,25 +83,18 @@ int main(void) {
     
     image map = imgio_readPPM("map.ppm");
     int whiteCells = 0;
-    for(int i = 0; i < map.width*map.height; i++) {
+    for(unsigned i = 0; i < map.width*map.height; i++) {
         if(memcmp(&map.pixels[i], &white, sizeof(rgb)) == 0) {
             whiteCells++;
         }
     }
     assert(whiteCells > 0);
-    player player1;
-    player1 = (player) {
-        .pos.x = 46,
-        .pos.y = 22,
-    };
+    player player1{ivec2{46, 22}};
     enemy enemies[2] = {
-        {.pos.x = 10, .pos.y = 27},
-        {.pos.x = 20, .pos.y = 1},
-        //{.pos.x = 3, .pos.y = 12},
+        ivec2{10, 27},
+        ivec2{20, 1},
+        //ivec2{3, 12},
     };
-    for(int i = 0; i < arrlen(enemies); i++) {
-        enemies[i].stunTimer = 0;
-    }
     
     if(memcmp(&rgbAt(map, player1.pos.x, player1.pos.y), &white, sizeof(rgb)) != 0) {
         perrorExit("Player starting location location must be open", -1);
@@ -134,7 +131,7 @@ int main(void) {
             IsKeyPressed(KEY_RIGHT) + IsKeyPressed(KEY_D)
             - IsKeyPressed(KEY_LEFT) - IsKeyPressed(KEY_A);
         if(taxicabDist(contenderPos, player1.pos) == 1) {
-            if(structeq(rgbAt(map, contenderPos.x, contenderPos.y), white)) {
+            if(rgbAt(map, contenderPos.x, contenderPos.y) == white) {
                 player1.pos = contenderPos;
                 playerMoves += 1;
             } else {
@@ -146,8 +143,8 @@ int main(void) {
             int rMouseX = (GetMouseX() - imgX);
             int rMouseY = (GetMouseY() - imgY);
             if(rMouseX >= 0 && rMouseY >= 0) {
-                int wallX = rMouseX/pxSize;
-                int wallY = rMouseY/pxSize;
+                unsigned wallX = rMouseX/pxSize;
+                unsigned wallY = rMouseY/pxSize;
                 if(wallX < map.width && wallY < map.height && rgbAt(map, wallX, wallY).r == 255) {
                     energy -= wallCost;
                     rgbAt(map, wallX, wallY).r = 0;
@@ -172,7 +169,7 @@ int main(void) {
         //recalculate each path, using the nodes that the shorter paths travel through as walls
         for(int i = 0; i < arrlen(enemyPaths)-1; i++) {
             //block off all parts of the path (except player location)
-            if(!path_isValid(enemyPaths[i])) { continue; }
+            if(!enemyPaths[i].isValid()) { continue; }
             for(int j = 0; j < enemyPaths[i].len-1; j++) {
                 assert(memcmp(&rgbAt(map,
                     enemyPaths[i].points[j].x,
@@ -182,7 +179,7 @@ int main(void) {
             }
             //check if the next path intersects
             bool intersectsNextPath = false;
-            if(!path_isValid(enemyPaths[i+1])) {continue; }
+            if(!enemyPaths[i+1].isValid()) {continue; }
             for(int j = 0; j < enemyPaths[i+1].len; j++) {
                 if(memcmp(&rgbAt(map,
                     enemyPaths[i+1].points[j].x,
@@ -200,7 +197,7 @@ int main(void) {
         }
         //remove blockage
         for(int i = 0; i < arrlen(enemyPaths)-1; i++) {
-            if(!path_isValid(enemyPaths[i])) { continue; }
+            if(!enemyPaths[i].isValid()) { continue; }
             for(int j = 0; j < enemyPaths[i].len-1; j++) {
                 assert(memcmp(&rgbAt(map,
                     enemyPaths[i].points[j].x,
@@ -221,7 +218,7 @@ int main(void) {
             }
             //move enemies along paths
             for(int i = 0; i < arrlen(enemies); i++) {
-                if(!path_isValid(enemyPaths[i]) || enemyPaths[i].len < 2) { continue; }
+                if(!enemyPaths[i].isValid() || enemyPaths[i].len < 2) { continue; }
                 if(enemies[enemyIndxs[i]].stunTimer > 0) {
                     enemies[enemyIndxs[i]].stunTimer --;
                     continue;
@@ -234,14 +231,14 @@ int main(void) {
             playerMoves -= moveThreshold;
         }
         //increase score and energy if player is touching coin
-        if(structeq(player1.pos, coin.pos)) {
+        if(player1.pos == coin.pos) {
             coin.pos = randomLocation(map, white, whiteCells);
             score++;
             energy += coinEnergy;
         }
         //end game if player is touching enemies
         for(int i = 0; i < arrlen(enemies); i++) {
-            if(structeq(player1.pos, enemies[i].pos)) {
+            if(player1.pos == enemies[i].pos) {
                 printf("GAME OVER\n\n");
                 FILE* hsStream = fopen("highscore", "r+");
                 if(hsStream == NULL) {
