@@ -32,7 +32,7 @@ int cmpAStarNode(aStarNode* A, aStarNode* B) {
     return AfVal - BfVal;
 }
 
-path aStar(const image navImg, const ivec2 start, const ivec2 goal) {
+path aStar(const image navImg, const ivec2 start, const ivec2 goal, bool isWall(const rgb)) {
     const path INVALID_PATH = (path) { .points = NULL, .len = INT_MAX, };
     assert(0 <= start.x && start.x < navImg.width);
     assert(0 <= start.y && start.y < navImg.height);
@@ -47,7 +47,7 @@ path aStar(const image navImg, const ivec2 start, const ivec2 goal) {
                 .pos.x = x,
                 .pos.y = y,
                 .gVal = INT_MAX,
-                .isWall = (rgbAt(navImg, x, y).r == 0),
+                .isWall = isWall(rgbAt(navImg, x, y)),
                 .isInPrioq = false,
             };
         }

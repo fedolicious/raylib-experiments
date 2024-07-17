@@ -10,5 +10,5 @@ typedef struct {
     unsigned len;
 } path;
 
-path aStar(const image navmesh, ivec2 start, ivec2 goal);
+path aStar(const image navmesh, ivec2 start, ivec2 goal, bool isWall(const rgb));
 bool path_isValid(const path p);

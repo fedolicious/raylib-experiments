@@ -61,7 +61,9 @@ ivec2 randomLocation(const image graph, const rgb locationType, const int locati
     perrorExit("Mismatch between actual and provided number of valid locations", -1);
     return (ivec2){};
 }
-
+bool isNotWhite(const rgb x) {
+    return !(x.r == 255 && x.g == 255 && x.b == 255);
+}
 int main(void) {
     const rgb white = (rgb){255,255,255};
     const rgb black = (rgb){0,0,0};
@@ -112,7 +114,7 @@ int main(void) {
     int score = 0;
     int energy = 0;
     
-    const int stunCost = 5;
+    const int wallCost = 5;
     const int moveThreshold = 1;
     const int coinEnergy = 10;
     collectible coin;
@@ -125,11 +127,13 @@ int main(void) {
         
         //move player
         ivec2 contenderPos = player1.pos;
-        if(IsKeyPressed(KEY_UP)) { contenderPos.y--; }
-        if(IsKeyPressed(KEY_DOWN)) { contenderPos.y++; }
-        if(IsKeyPressed(KEY_LEFT)) { contenderPos.x--; }
-        if(IsKeyPressed(KEY_RIGHT)) { contenderPos.x++; }
-        if(!structeq(contenderPos, player1.pos)) {
+        contenderPos.y +=
+            IsKeyPressed(KEY_DOWN) + IsKeyPressed(KEY_S)
+            - IsKeyPressed(KEY_UP) - IsKeyPressed(KEY_W);
+        contenderPos.x +=
+            IsKeyPressed(KEY_RIGHT) + IsKeyPressed(KEY_D)
+            - IsKeyPressed(KEY_LEFT) - IsKeyPressed(KEY_A);
+        if(taxicabDist(contenderPos, player1.pos) == 1) {
             if(structeq(rgbAt(map, contenderPos.x, contenderPos.y), white)) {
                 player1.pos = contenderPos;
                 playerMoves += 1;
@@ -137,28 +141,24 @@ int main(void) {
                 //failed to move
             }
         }
-        //stun enemies
-        if(energy >= stunCost && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            int enemyIndex = -1;
-            for(int i = 0; i < arrlen(enemies); i++) {
-                double distX = imgX + pxSize*enemies[i].pos.x + pxSize/2 - GetMouseX();
-                double distY = imgY + pxSize*enemies[i].pos.y + pxSize/2 - GetMouseY();
-                if(distX*distX + distY*distY < pxSize*pxSize/4) {
-                    enemyIndex = i;
-                    break;
+        //place wall
+        if(energy >= wallCost && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            int rMouseX = (GetMouseX() - imgX);
+            int rMouseY = (GetMouseY() - imgY);
+            if(rMouseX >= 0 && rMouseY >= 0) {
+                int wallX = rMouseX/pxSize;
+                int wallY = rMouseY/pxSize;
+                if(wallX < map.width && wallY < map.height && rgbAt(map, wallX, wallY).r == 255) {
+                    energy -= wallCost;
+                    rgbAt(map, wallX, wallY).r = 0;
                 }
             }
-            if(enemyIndex >= 0) {
-                energy -= stunCost;
-                enemies[enemyIndex].stunTimer += stunCost;
-            }
         }
-        
         //calculate each path to the player
         path enemyPaths[arrlen(enemies)];
         int enemyIndxs[arrlen(enemies)];
         for(int i = 0; i < arrlen(enemyPaths); i++) {
-            enemyPaths[i] = aStar(map, enemies[i].pos, player1.pos);
+            enemyPaths[i] = aStar(map, enemies[i].pos, player1.pos, isNotWhite);
             enemyIndxs[i] = i;
         }
         //sort (bubble)
@@ -195,7 +195,7 @@ int main(void) {
             //if it intersects, recalculate it, otherwise do nothing
             if(intersectsNextPath) {
                 free(enemyPaths[i+1].points);
-                enemyPaths[i+1] = aStar(map, enemies[enemyIndxs[i+1]].pos, player1.pos);
+                enemyPaths[i+1] = aStar(map, enemies[enemyIndxs[i+1]].pos, player1.pos, isNotWhite);
             }
         }
         //remove blockage
@@ -209,8 +209,17 @@ int main(void) {
                 rgbAt(map, enemyPaths[i].points[j].x, enemyPaths[i].points[j].y) = white;
             }
         }
-        //move enemies along paths
+        //move one step in the game
         if(IsKeyPressed(KEY_SPACE) || playerMoves >= moveThreshold) {
+            //decay all walls
+            for(int i = 0; i < map.width*map.height; i++) {
+                rgb* pixel = &map.pixels[i];
+                if(pixel->g == 255 && pixel->r < 255) {
+                    unsigned char newR = pixel->r + 60;
+                    pixel->r = (newR < pixel->r)? 255 : newR;
+                }
+            }
+            //move enemies along paths
             for(int i = 0; i < arrlen(enemies); i++) {
                 if(!path_isValid(enemyPaths[i]) || enemyPaths[i].len < 2) { continue; }
                 if(enemies[enemyIndxs[i]].stunTimer > 0) {
