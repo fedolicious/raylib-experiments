@@ -9,8 +9,9 @@
 struct ivec2 {
     int x;
     int y;
-    bool operator==(const ivec2& other);
-    bool operator!=(const ivec2& other);
+    bool operator==(const ivec2 other) const;
+    bool operator!=(const ivec2 other) const;
+    ivec2 operator+(const ivec2 other) const;
 };
 
 void perrorExit(const char* msg, int errorValue);

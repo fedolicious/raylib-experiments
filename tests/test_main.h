@@ -9,10 +9,14 @@
     f(test_astar_maze1)       \
     f(test_astar_maze2)       \
     f(test_astar_maze3)       \
+    f(test_astar_mazeTripleWeight) \
     f(test_astar_mazeNoPath) \
     f(test_astar_mazeStartInWall) \
     f(test_astar_mazeGoalInWall) \
     f(test_astar_mazeStartAndGoalInWall) \
+    f(test_astar_startInGoal) \
+    f(test_graph_loops) \
+    f(test_graph_blank) \
 
 #define VOID_FUNC(x) void x();
 

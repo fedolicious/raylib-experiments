@@ -24,24 +24,26 @@
 #include "raylib.h"
 
 #include "imgio.h"
-#include "mystdlib.h"
+#include "collections/graph.h"
 #include "nav/pathfind.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <errno.h>
-#include <assert.h>
+#include <iostream>
+#include <filesystem>
+#include <format>
+#include <numeric>
+#include <array>
+#include <cassert>
 
-#define log(...) fprintf(logStream, __VA_ARGS__); fflush(logStream)
 typedef struct {
     ivec2 pos;
 } player;
 struct enemy {
     ivec2 pos;
+    path plannedPath;
     int stunTimer;
     enemy(ivec2 p) :
         pos{p},
+        plannedPath{},
         stunTimer{0}
     {}
 };
@@ -53,10 +55,10 @@ ivec2 randomLocation(const image graph, const rgb locationType, const int locati
     int index = GetRandomValue(0, locations-1);
     for(unsigned i = 0; i < graph.width*graph.height; i++) {
         if(graph.pixels[i] != locationType) { continue; }
-        if(index == 0) { 
+        if(index == 0) {
             return (ivec2) {
-                .x = i%graph.width,
-                .y = i/graph.width,
+                .x = static_cast<int>(i%graph.width),
+                .y = static_cast<int>(i/graph.width),
             };
         } else {
             index--;
@@ -68,6 +70,7 @@ ivec2 randomLocation(const image graph, const rgb locationType, const int locati
 bool isNotWhite(const rgb x) {
     return !(x.r == 255 && x.g == 255 && x.b == 255);
 }
+
 int main(void) {
     const rgb white = (rgb){255,255,255};
     const rgb black = (rgb){0,0,0};
@@ -77,9 +80,7 @@ int main(void) {
     InitWindow(screenWidth, screenHeight, "raylib [core] example - basic window");
     SetTargetFPS(60);
     
-    chdir("resources");
-    
-    FILE* logStream = fopen("log.txt", "w");
+    std::filesystem::current_path("resources");
     
     image map = imgio_readPPM("map.ppm");
     int whiteCells = 0;
@@ -90,10 +91,9 @@ int main(void) {
     }
     assert(whiteCells > 0);
     player player1{ivec2{46, 22}};
-    enemy enemies[2] = {
+    std::array<enemy, 2> enemies{
         ivec2{10, 27},
         ivec2{20, 1},
-        //ivec2{3, 12},
     };
     
     if(memcmp(&rgbAt(map, player1.pos.x, player1.pos.y), &white, sizeof(rgb)) != 0) {
@@ -104,8 +104,8 @@ int main(void) {
     int imgY = 10;
     int pxSize = 35;
     
-    int keysPressed[10];
-    int numKeysPressed;
+    std::array<int,10> keysPressed;
+    std::size_t numKeysPressed;
     
     int playerMoves = 0;
     int score = 0;
@@ -151,21 +151,30 @@ int main(void) {
                 }
             }
         }
+        class map_node {
+            unsigned wall_health;
+        };
+        const graph<map_node> map_graph{
+            map,
+            [&](rgb x){ return x == white; }
+            //[&](rgb x){ return x != black; }
+            //[](rgb x){ return (255-x.r)/60; }
+        };
+        std::array<decltype(enemies)::value_type*, enemies.size()> enemyRefs;
+        std::iota(enemyRefs.begin(), enemyRefs.end(), &*enemies.begin());
+        
         //calculate each path to the player
-        path enemyPaths[arrlen(enemies)];
-        int enemyIndxs[arrlen(enemies)];
-        for(int i = 0; i < arrlen(enemyPaths); i++) {
-            enemyPaths[i] = aStar(map, enemies[i].pos, player1.pos, isNotWhite);
-            enemyIndxs[i] = i;
+        for(auto& enemy : enemies) {
+            enemy.plannedPath = aStar(map_graph, enemy.pos, player1.pos);
         }
-        //sort (bubble)
-        for(int j = 0; j < arrlen(enemyPaths)-1; j++)
-        for(int i = 0; i < arrlen(enemyPaths)-1; i++) {
-            if(enemyPaths[i].len > enemyPaths[i+1].len) {
-                memswap(&enemyPaths[i], &enemyPaths[i+1], sizeof(*enemyPaths));
-                memswap(&enemyIndxs[i], &enemyIndxs[i+1], sizeof(*enemyIndxs));
+        /*
+        //sort from best to worst path
+        std::sort(enemyRefs.begin(), enemyRefs.end(),
+            [](const auto* a, const auto* b){
+                return a->plannedPath.length() < b->plannedPath.length();
             }
-        }
+        );
+        
         //recalculate each path, using the nodes that the shorter paths travel through as walls
         for(int i = 0; i < arrlen(enemyPaths)-1; i++) {
             //block off all parts of the path (except player location)
@@ -206,10 +215,11 @@ int main(void) {
                 rgbAt(map, enemyPaths[i].points[j].x, enemyPaths[i].points[j].y) = white;
             }
         }
+        */
         //move one step in the game
         if(IsKeyPressed(KEY_SPACE) || playerMoves >= moveThreshold) {
             //decay all walls
-            for(int i = 0; i < map.width*map.height; i++) {
+            for(unsigned i = 0; i < map.width*map.height; i++) {
                 rgb* pixel = &map.pixels[i];
                 if(pixel->g == 255 && pixel->r < 255) {
                     unsigned char newR = pixel->r + 60;
@@ -217,16 +227,17 @@ int main(void) {
                 }
             }
             //move enemies along paths
-            for(int i = 0; i < arrlen(enemies); i++) {
-                if(!enemyPaths[i].isValid() || enemyPaths[i].len < 2) { continue; }
-                if(enemies[enemyIndxs[i]].stunTimer > 0) {
-                    enemies[enemyIndxs[i]].stunTimer --;
+            for(auto& enemy : enemies) {
+                if(!enemy.plannedPath.isValid() || enemy.plannedPath.nodes.size() < 2) { continue; }
+                if(enemy.stunTimer > 0) {
+                    enemy.stunTimer --;
                     continue;
                 }
-                enemy* const currEnemy = &enemies[enemyIndxs[i]];
-                assert(memcmp(&enemyPaths[i].points[0], &currEnemy->pos, sizeof(currEnemy->pos)) == 0);
-                assert(taxicabDist(enemyPaths[i].points[1], currEnemy->pos) == 1);
-                currEnemy->pos = enemyPaths[i].points[1];
+                const auto& firstPos = std::prev(enemy.plannedPath.nodes.end(), 1)->pos;
+                const auto& secondPos = std::prev(enemy.plannedPath.nodes.end(), 2)->pos;
+                assert(firstPos == enemy.pos);
+                assert(taxicabDist(secondPos, enemy.pos) == 1);
+                enemy.pos = secondPos;
             }
             playerMoves -= moveThreshold;
         }
@@ -237,46 +248,45 @@ int main(void) {
             energy += coinEnergy;
         }
         //end game if player is touching enemies
-        for(int i = 0; i < arrlen(enemies); i++) {
-            if(player1.pos == enemies[i].pos) {
-                printf("GAME OVER\n\n");
-                FILE* hsStream = fopen("highscore", "r+");
-                if(hsStream == NULL) {
-                    hsStream = fopen("highscore", "w");
-                    printf("Score: %d\n", score);
+        for(const auto& enemy : enemies) {
+            if(player1.pos != enemy.pos) { continue; }
+            printf("GAME OVER\n\n");
+            FILE* hsStream = fopen("highscore", "r+");
+            if(hsStream == NULL) {
+                hsStream = fopen("highscore", "w");
+                printf("Score: %d\n", score);
+                assert(fwrite(&score, sizeof(score), 1, hsStream) == 1);
+            } else {
+                __typeof__(score) highscore;
+                assert(fread(&highscore, sizeof(highscore), 1, hsStream) == 1);
+                if(score > highscore) {
+                    printf("New High Score!: %d\n", score);
+                    fseek(hsStream, 0, SEEK_SET);
                     assert(fwrite(&score, sizeof(score), 1, hsStream) == 1);
                 } else {
-                    __typeof__(score) highscore;
-                    assert(fread(&highscore, sizeof(highscore), 1, hsStream) == 1);
-                    if(score > highscore) {
-                        printf("New High Score!: %d\n", score);
-                        fseek(hsStream, 0, SEEK_SET);
-                        assert(fwrite(&score, sizeof(score), 1, hsStream) == 1);
-                    } else {
-                        printf("Score: %d\nHigh Score: %d\n", score, highscore);
-                    }
+                    printf("Score: %d\nHigh Score: %d\n", score, highscore);
                 }
-                fclose(hsStream);
-                exit(0);
             }
+            fclose(hsStream);
+            exit(0);
         }
         //get keys pressed
         numKeysPressed = 0;
         int nextKey = GetKeyPressed();
-        while(nextKey && numKeysPressed < arrlen(keysPressed)) {
+        while(nextKey && numKeysPressed < keysPressed.size()) {
             keysPressed[numKeysPressed] = nextKey;
             numKeysPressed++;
             nextKey = GetKeyPressed();
         }
         
         BeginDrawing(); {
-
+            
             ClearBackground(RAYWHITE);
             DrawText("Congrats! You created your first window!", 190, 200, 20, LIGHTGRAY);
             
             //draw map
-            for(int y = 0; y < map.height; y++)
-            for(int x = 0; x < map.width; x++) {
+            for(unsigned y = 0; y < map.height; y++)
+            for(unsigned x = 0; x < map.width; x++) {
                 rgb pxl = rgbAt(map, x, y);
                 DrawRectangle(
                     imgX + pxSize*x,
@@ -301,23 +311,33 @@ int main(void) {
                 ORANGE
             );
             //draw enemies
-            for(int i = 0; i < arrlen(enemies); i++) {
-                int enemyX = imgX + pxSize*enemies[i].pos.x + pxSize/2;
-                int enemyY = imgY + pxSize*enemies[i].pos.y + pxSize/2;
+            for(const auto& enemy : enemies) {
+                int enemyX = imgX + pxSize*enemy.pos.x + pxSize/2;
+                int enemyY = imgY + pxSize*enemy.pos.y + pxSize/2;
                 DrawEllipse(enemyX, enemyY, pxSize/2, pxSize/2, RED);
-                DrawText(TextFormat("%d", enemies[i].stunTimer), enemyX-10, enemyY-10, 20, WHITE);
+                DrawText(TextFormat("%d", enemy.stunTimer), enemyX-10, enemyY-10, 20, WHITE);
+            }
+            //draw paths
+            for(const auto& enemy : enemies) {
+                // const auto& enemy = enemies[0];
+                const auto& nodes = enemy.plannedPath.nodes;
+                for(auto it = nodes.begin(); it != std::prev(nodes.end()); it++) {
+                    const auto it2 = it+1;
+                    DrawLine(
+                        imgX + pxSize*it->pos.x + pxSize/2,
+                        imgY + pxSize*it->pos.y + pxSize/2,
+                        imgX + pxSize*it2->pos.x + pxSize/2,
+                        imgY + pxSize*it2->pos.y + pxSize/2,
+                        BLUE
+                    );
+                }
             }
             //draw score
             DrawText(TextFormat("SCORE: %d\n\n\nENERGY: %d", score, energy), 20, 200, 40, PINK);
 
         } EndDrawing();
-        
-        for(int i = 0; i < arrlen(enemyPaths); i++) {
-            if(enemyPaths[i].points != NULL) { free(enemyPaths[i].points); }
-        }
         //----------------------------------------------------------------------------------
     }
-    assert(fclose(logStream) == 0);
     free(map.pixels);
 
     // De-Initialization

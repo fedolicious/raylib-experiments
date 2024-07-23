@@ -10,7 +10,7 @@ struct prioqElt {
     int x;
     int y;
     int priority;
-    bool operator==(const prioqElt& other) {
+    bool operator==(const prioqElt& other) const {
         return
             x == other.x &&
             y == other.y &&
