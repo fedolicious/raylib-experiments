@@ -152,20 +152,28 @@ int main(void) {
             }
         }
         class map_node {
+        public:
             unsigned wall_health;
         };
         const graph<map_node> map_graph{
             map,
-            [&](rgb x){ return x == white; }
-            //[&](rgb x){ return x != black; }
-            //[](rgb x){ return (255-x.r)/60; }
+            [&](rgb x){ return x != black; },
+            [](rgb x){ return map_node{unsigned((int(255-x.r)+59)/60)}; }
         };
         std::array<decltype(enemies)::value_type*, enemies.size()> enemyRefs;
         std::iota(enemyRefs.begin(), enemyRefs.end(), &*enemies.begin());
         
         //calculate each path to the player
-        for(auto& enemy : enemies) {
-            enemy.plannedPath = aStar(map_graph, enemy.pos, player1.pos);
+        for(auto& enemy : enemies) { //TODO heuristic based on distance to other enemies
+            enemy.plannedPath = a_star(map_graph, enemy.pos, player1.pos,
+                [](const auto& a, const auto& b)->unsigned{
+                    if(b.data.wall_health > a.g_val) {
+                        return 1 + b.data.wall_health - a.g_val;
+                    } else {
+                        return 1;
+                    }
+                }
+            );
         }
         /*
         //sort from best to worst path
@@ -201,7 +209,7 @@ int main(void) {
             //if it intersects, recalculate it, otherwise do nothing
             if(intersectsNextPath) {
                 free(enemyPaths[i+1].points);
-                enemyPaths[i+1] = aStar(map, enemies[enemyIndxs[i+1]].pos, player1.pos, isNotWhite);
+                enemyPaths[i+1] = a_star(map, enemies[enemyIndxs[i+1]].pos, player1.pos, isNotWhite);
             }
         }
         //remove blockage
@@ -233,11 +241,13 @@ int main(void) {
                     enemy.stunTimer --;
                     continue;
                 }
-                const auto& firstPos = std::prev(enemy.plannedPath.nodes.end(), 1)->pos;
-                const auto& secondPos = std::prev(enemy.plannedPath.nodes.end(), 2)->pos;
-                assert(firstPos == enemy.pos);
-                assert(taxicabDist(secondPos, enemy.pos) == 1);
-                enemy.pos = secondPos;
+                const auto& firstNode = *std::prev(enemy.plannedPath.nodes.end(), 1);
+                const auto& secondNode = *std::prev(enemy.plannedPath.nodes.end(), 2);
+                assert(firstNode.pos == enemy.pos);
+                assert(taxicabDist(secondNode.pos, enemy.pos) == 1);
+                if(secondNode.weight == 1) {
+                    enemy.pos = secondNode.pos;
+                }
             }
             playerMoves -= moveThreshold;
         }

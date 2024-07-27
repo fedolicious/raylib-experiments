@@ -22,6 +22,10 @@ a_star_data<GraphT>::node_data::node_data():
     in_prioq{false}
 {}
 template <typename GraphT>
+inline const a_star_data<GraphT>::graph_data a_star_data<GraphT>::graph_data_of(const GraphT::node& node) const {
+    return a_star_data<GraphT>::graph_data{node.data, this->data_of(node).g_val};
+}
+template <typename GraphT>
 inline const a_star_data<GraphT>::node_data& a_star_data<GraphT>::data_of(const GraphT::node& node) const {
     return data[&node - graph.nodes.data()];
 }
@@ -36,9 +40,9 @@ a_star_data<GraphT>::a_star_data(const GraphT& graph):
 {}
 
 template<typename T, class WeightFunc, class HeuristicFunc>
-path aStar(
+path a_star(
     const graph<T>& navGraph, const ivec2 start, const ivec2 goal,
-    WeightFunc edgeWeight, HeuristicFunc
+    WeightFunc edgeWeight, HeuristicFunc heur
 ) { //TODO heuristic
     using node = typename graph<T>::node;
     
@@ -49,10 +53,10 @@ path aStar(
         return {};
     }
     
-    a_star_data graphData{navGraph};
+    a_star_data aStarData{navGraph};
     
     const node& startNode = *startIter;
-    auto& startData = graphData.data_of(startNode);
+    auto& startData = aStarData.data_of(startNode);
     startData.came_from = nullptr;
     startData.g_val = 0;
     const node& goalNode = *goalIter;
@@ -64,13 +68,13 @@ path aStar(
     while(!nodes.empty()) {
         auto minIter = std::min_element(nodes.begin(), nodes.end(),
             [&](const auto* A, const auto* B){
-                const int AfVal = graphData.data_of(*A).g_val + taxicabDist(A->pos, goal);
-                const int BfVal = graphData.data_of(*B).g_val + taxicabDist(B->pos, goal);
+                const int AfVal = aStarData.data_of(*A).g_val + taxicabDist(A->pos, goal);
+                const int BfVal = aStarData.data_of(*B).g_val + taxicabDist(B->pos, goal);
                 return AfVal < BfVal;
             });
         assert(minIter != nodes.end());
         bestNode = *minIter;
-        graphData.data_of(*bestNode).in_prioq = false;
+        aStarData.data_of(*bestNode).in_prioq = false;
         nodes.erase(minIter);
         
         if(bestNode == &goalNode) {
@@ -80,23 +84,27 @@ path aStar(
         
         for(auto i : bestNode->neighborIndices) {
             const node& neighbor = navGraph.nodes.at(i);
+            
             const unsigned contenderGVal =
-                graphData.data_of(*bestNode).g_val +
-                edgeWeight(bestNode->data, neighbor.data);
-            if(graphData.data[i].g_val <= contenderGVal) {
+                aStarData.data_of(*bestNode).g_val +
+                edgeWeight(
+                    aStarData.graph_data_of(*bestNode),
+                    aStarData.graph_data_of(neighbor)
+                );
+            if(aStarData.data[i].g_val <= contenderGVal) {
                 continue;
             }
-            graphData.data[i].g_val = contenderGVal;
-            graphData.data[i].came_from = bestNode;
-            if(!graphData.data[i].in_prioq) {
+            aStarData.data[i].g_val = contenderGVal;
+            aStarData.data[i].came_from = bestNode;
+            if(!aStarData.data[i].in_prioq) {
                 nodes.push_back(&neighbor);
-                graphData.data[i].in_prioq = true;
+                aStarData.data[i].in_prioq = true;
             }
         }
     }
     if(!goalFound) {
         return {};
     } else {
-        return path(graphData, *bestNode);
+        return path(aStarData, *bestNode);
     }
 }

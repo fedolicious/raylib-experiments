@@ -8,11 +8,12 @@
 #include <unordered_set>
 #include <algorithm>
 
-bool isWhite(rgb x) { return x == rgb{255, 255, 255}; }
+static bool isWhite(rgb x) { return x == rgb{255, 255, 255}; }
+static int zeroFn(rgb) { return 0; }
 
 void test_graph_loops() {
     image img = imgio_readPPM("resources/test/loops.ppm");
-    graph<int> g{img, isWhite};
+    graph<int> g{img, isWhite, zeroFn};
     MY_TC(g.nodes.size() == 32);
     for(const auto& node : g.nodes) {
         MY_TC(node.neighborIndices.size() == 2);
@@ -53,7 +54,7 @@ void test_graph_loops() {
 }
 void test_graph_blank() {
     image img = imgio_readPPM("resources/test/blank.ppm");
-    graph<float> g{img, isWhite};
+    graph<float> g{img, isWhite, zeroFn};
     MY_TC(g.nodes.size() == 0);
     free(img.pixels);
 }

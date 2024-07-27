@@ -7,13 +7,14 @@
 
 #include <string.h>
 
-bool hasMaxRed(rgb x) { return x.r == 255; }
+static bool hasMaxRed(rgb x) { return x.r == 255; }
+static int zeroFn(rgb) { return 0; }
 
 void testMaze(const char* fileName, const ivec2 start, const ivec2 goal, const unsigned nodeCount) {
     constexpr rgb red = (rgb) {255, 0, 0};
     
     image img = imgio_readPPM(fileName);
-    path p = aStar(graph<int>{img, hasMaxRed}, start, goal);
+    path p = a_star(graph<int>{img, hasMaxRed, zeroFn}, start, goal);
     MY_TC(p.nodes.size() == nodeCount);
     MY_TC(p.length() == nodeCount-1);
     for(auto& node : p.nodes) {
@@ -34,7 +35,7 @@ void test_astar_mazeTripleWeight() {
     constexpr rgb red = (rgb) {255, 0, 0};
     
     image img = imgio_readPPM("resources/test/maze1.ppm");
-    path p = aStar(graph<int>{img, hasMaxRed}, (ivec2){0, 1}, (ivec2){40,39}, [](auto, auto){return 17;});
+    path p = a_star(graph<int>{img, hasMaxRed, zeroFn}, (ivec2){0, 1}, (ivec2){40,39}, [](auto, auto){return 17;});
     MY_TC(p.nodes.size() == 187);
     MY_TC(p.length() == 186 * 17);
     for(auto& node : p.nodes) {
@@ -50,31 +51,31 @@ void test_astar_mazeTripleWeight() {
 }
 void test_astar_mazeNoPath() {
     image img = imgio_readPPM("resources/test/maze4.ppm");
-    path p = aStar(graph<int>{img, hasMaxRed}, (ivec2){19,0}, (ivec2){21,40});
+    path p = a_star(graph<int>{img, hasMaxRed, zeroFn}, (ivec2){19,0}, (ivec2){21,40});
     MY_TC(!p.isValid());
     free(img.pixels);
 }
 void test_astar_mazeStartInWall() {
     image img = imgio_readPPM("resources/test/maze1.ppm");
-    path p = aStar(graph<int>{img, hasMaxRed}, (ivec2){0,0}, (ivec2){40,39});
+    path p = a_star(graph<int>{img, hasMaxRed, zeroFn}, (ivec2){0,0}, (ivec2){40,39});
     MY_TC(!p.isValid());
     free(img.pixels);
 }
 void test_astar_mazeGoalInWall() {
     image img = imgio_readPPM("resources/test/maze1.ppm");
-    path p = aStar(graph<int>{img, hasMaxRed}, (ivec2){0,1}, (ivec2){40,38});
+    path p = a_star(graph<int>{img, hasMaxRed, zeroFn}, (ivec2){0,1}, (ivec2){40,38});
     MY_TC(!p.isValid());
     free(img.pixels);
 }
 void test_astar_mazeStartAndGoalInWall() {
     image img = imgio_readPPM("resources/test/maze1.ppm");
-    path p = aStar(graph<int>{img, hasMaxRed}, (ivec2){0,2}, (ivec2){40,40});
+    path p = a_star(graph<int>{img, hasMaxRed, zeroFn}, (ivec2){0,2}, (ivec2){40,40});
     MY_TC(!p.isValid());
     free(img.pixels);
 }
 void test_astar_startInGoal() {
     image img = imgio_readPPM("resources/test/maze4.ppm");
-    path p = aStar(graph<int>{img, hasMaxRed}, (ivec2){19,0}, (ivec2){19,0});
+    path p = a_star(graph<int>{img, hasMaxRed, zeroFn}, (ivec2){19,0}, (ivec2){19,0});
     MY_TC(p.nodes.size() == 1);
     MY_TC(p.nodes[0].weight == 0);
     MY_TC((p.nodes[0].pos == (ivec2){19,0}));

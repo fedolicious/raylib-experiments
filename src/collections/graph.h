@@ -20,7 +20,7 @@ public:
     };
     typedef T member_type;
     std::vector<graph<T>::node> nodes;
-    template<typename Func>
-    graph(const image&, Func);
+    template<class InGraphFunc, class ConstructionFunc>
+    graph(const image&, InGraphFunc, ConstructionFunc);
 };
 #include "graph.tpp"
