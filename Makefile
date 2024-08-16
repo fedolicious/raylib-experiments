@@ -24,10 +24,10 @@
 .PHONY: all clean
 
 # Define required raylib variables
-PROJECT_NAME       ?= alfredproject
+PROJECT_NAME       ?= exec
 RAYLIB_VERSION     ?= 4.2.0
 RAYLIB_PATH        ?= C:\raylib\raylib
-MAIN_FILE          ?= project.c
+MAIN_FILE          ?= project.cpp
 
 # Define compiler path on Windows
 COMPILER_PATH      ?= C:/raylib/w64devkit/bin
@@ -54,7 +54,7 @@ RAYLIB_H_INSTALL_PATH ?= $(DESTDIR)/include
 RAYLIB_LIBTYPE        ?= STATIC
 
 # Build mode for project: DEBUG or RELEASE
-BUILD_MODE            ?= RELEASE
+BUILD_MODE            ?= DEBUG
 
 # Use external GLFW library instead of rglfw module
 # TODO: Review usage on Linux. Target version of choice. Switch on -lglfw or -lglfw3
@@ -359,12 +359,12 @@ TEST_DIR = tests
 
 # Define all object files from source files
 MAIN_SRC = $(SRC_DIR)/$(MAIN_FILE)
-MAIN_OBJ = $(MAIN_SRC:%.c=$(OBJ_DIR)/%.o)
-TEST_SRC = $(wildcard $(TEST_DIR)/*.c) $(wildcard $(TEST_DIR)/*/*.c)
-TEST_OBJS = $(TEST_SRC:%.c=$(OBJ_DIR)/%.o)
-SRC = $(filter-out $(MAIN_SRC), $(wildcard $(SRC_DIR)/*.c) $(wildcard $(SRC_DIR)/*/*.c))
-OBJS = $(SRC:%.c=$(OBJ_DIR)/%.o)
-#OBJS ?= main.c
+MAIN_OBJ = $(MAIN_SRC:%.cpp=$(OBJ_DIR)/%.o)
+TEST_SRC = $(wildcard $(TEST_DIR)/*.cpp) $(wildcard $(TEST_DIR)/*/*.cpp)
+TEST_OBJS = $(TEST_SRC:%.cpp=$(OBJ_DIR)/%.o)
+SRC = $(filter-out $(MAIN_SRC), $(wildcard $(SRC_DIR)/*.cpp) $(wildcard $(SRC_DIR)/*/*.cpp))
+OBJS = $(SRC:%.cpp=$(OBJ_DIR)/%.o)
+#OBJS ?= main.cpp
 
 # For Android platform we call a custom Makefile.Android
 ifeq ($(PLATFORM),PLATFORM_ANDROID)
@@ -385,8 +385,8 @@ $(PROJECT_NAME): $(MAIN_OBJ) $(OBJS)
 
 # Compile source files
 # NOTE: This pattern will compile every module defined on $(OBJS)
-#%.o: %.c
-$(OBJ_DIR)/%.o: %.c
+#%.o: %.cpp
+$(OBJ_DIR)/%.o: %.cpp
 	mkdir -p $(@D)
 	$(CC) -c $< -o $@ $(CFLAGS) $(INCLUDE_PATHS) -D$(PLATFORM)
 
@@ -400,7 +400,7 @@ $(PROJECT_NAME)_test: $(TEST_OBJS) $(OBJS)
 	$(CC) -o $(PROJECT_NAME)_test$(EXT) $(TEST_OBJS) $(OBJS) $(CFLAGS) $(INCLUDE_PATHS) $(LDFLAGS) $(LDLIBS) -D$(PLATFORM)
 
 # Compile source files
-$(OBJ_DIR)/%.o: %.c
+$(OBJ_DIR)/%.o: %.cpp
 	mkdir -p $(@D)
 	$(CC) -c $< -o $@ $(CFLAGS) $(INCLUDE_PATHS) -D$(PLATFORM)
 

@@ -4,3 +4,4 @@ obj
 *.o
 resources/maze.ppm
 resources/highscore
+.idea

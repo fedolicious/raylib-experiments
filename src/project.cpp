@@ -33,6 +33,8 @@
 #include <numeric>
 #include <array>
 #include <cassert>
+#include <chrono>
+#include <thread>
 
 typedef struct {
     ivec2 pos;
@@ -118,6 +120,7 @@ int main(void) {
     coin.pos = randomLocation(map, white, whiteCells);
     // Main game loop
     while (!WindowShouldClose()) { // Detect window close button or ESC key
+        auto beginTime = std::chrono::high_resolution_clock::now();
         //zoom in/out
         if(IsKeyPressed(KEY_EQUAL)) { pxSize++; }
         if(IsKeyPressed(KEY_MINUS)) { pxSize--; }
@@ -288,7 +291,7 @@ int main(void) {
             numKeysPressed++;
             nextKey = GetKeyPressed();
         }
-        
+        auto execTime = std::chrono::high_resolution_clock::now() - beginTime;
         BeginDrawing(); {
             
             ClearBackground(RAYWHITE);
@@ -344,6 +347,8 @@ int main(void) {
             }
             //draw score
             DrawText(TextFormat("SCORE: %d\n\n\nENERGY: %d", score, energy), 20, 200, 40, PINK);
+            //draw time
+            DrawText(TextFormat("exec time (ms): %lf", std::chrono::duration<double, std::milli>(execTime).count()), 10, 10, 20, LIME);
 
         } EndDrawing();
         //----------------------------------------------------------------------------------
