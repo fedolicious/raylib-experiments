@@ -1,7 +1,6 @@
 log.txt
 *.exe
-obj
-*.o
+/cmake-build-debug/
 resources/maze.ppm
 resources/highscore
 .idea
