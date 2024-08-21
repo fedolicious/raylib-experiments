@@ -41,6 +41,7 @@ class a_star_data {
 public:
     struct graph_data {
         const GraphT::member_type& data;
+        const ivec2 pos;
         const decltype(node_data::g_val) g_val;
     };
     inline const graph_data graph_data_of(const GraphT::node&) const;

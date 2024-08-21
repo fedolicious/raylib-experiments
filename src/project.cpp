@@ -84,7 +84,7 @@ int main(void) {
     
     std::filesystem::current_path("resources");
     
-    image map = imgio_readPPM("map.ppm");
+    image map = imgio_readPPM("donut.ppm");
     int whiteCells = 0;
     for(unsigned i = 0; i < map.width*map.height; i++) {
         if(memcmp(&map.pixels[i], &white, sizeof(rgb)) == 0) {
@@ -95,7 +95,7 @@ int main(void) {
     player player1{ivec2{46, 22}};
     std::array<enemy, 2> enemies{
         ivec2{10, 27},
-        ivec2{20, 1},
+        ivec2{12, 27},
     };
     
     if(memcmp(&rgbAt(map, player1.pos.x, player1.pos.y), &white, sizeof(rgb)) != 0) {
@@ -157,76 +157,44 @@ int main(void) {
         class map_node {
         public:
             unsigned wall_health;
+            static unsigned map_nodes_weight(const struct a_star_data<graph<map_node> >::graph_data& a, const struct a_star_data<graph<map_node> >::graph_data& b) {
+                if(b.data.wall_health > a.g_val) {
+                    return 1 + b.data.wall_health - a.g_val;
+                } else {
+                    return 1;
+                }
+            }
         };
         const graph<map_node> map_graph{
             map,
             [&](rgb x){ return x != black; },
             [](rgb x){ return map_node{unsigned((int(255-x.r)+59)/60)}; }
         };
-        std::array<decltype(enemies)::value_type*, enemies.size()> enemyRefs;
-        std::iota(enemyRefs.begin(), enemyRefs.end(), &*enemies.begin());
-        
+
+        //ENEMY PATHING
+        static_assert(enemies.size() == 2);
         //calculate each path to the player
         for(auto& enemy : enemies) { //TODO heuristic based on distance to other enemies
-            enemy.plannedPath = a_star(map_graph, enemy.pos, player1.pos,
-                [](const auto& a, const auto& b)->unsigned{
-                    if(b.data.wall_health > a.g_val) {
-                        return 1 + b.data.wall_health - a.g_val;
-                    } else {
-                        return 1;
-                    }
-                }
-            );
+            enemy.plannedPath = a_star(map_graph, enemy.pos, player1.pos, map_node::map_nodes_weight);
         }
-        /*
-        //sort from best to worst path
-        std::sort(enemyRefs.begin(), enemyRefs.end(),
-            [](const auto* a, const auto* b){
-                return a->plannedPath.length() < b->plannedPath.length();
+        const bool& firstEnemyCloser = enemies[0].plannedPath.length() < enemies[1].plannedPath.length();
+        const enemy& closeEnemy = firstEnemyCloser? enemies[0] : enemies[1];
+        enemy& farEnemy = firstEnemyCloser? enemies[1] : enemies[0];
+
+        #define OVERLAP_MULTIPLIER 100
+        farEnemy.plannedPath = a_star(map_graph, farEnemy.pos, player1.pos,
+            [&](const auto& a, const auto& b)->unsigned{
+                int distToCloseEnemy = a_star(map_graph, closeEnemy.pos, a.pos, map_node::map_nodes_weight).length();
+                int multiplier = OVERLAP_MULTIPLIER - distToCloseEnemy;
+                if(multiplier < 1) { multiplier = 1; }
+                if(distToCloseEnemy < closeEnemy.plannedPath.length()) {
+                    return map_node::map_nodes_weight(a,b)*multiplier;
+                } else {
+                    return map_node::map_nodes_weight(a,b);
+                }
             }
         );
-        
-        //recalculate each path, using the nodes that the shorter paths travel through as walls
-        for(int i = 0; i < arrlen(enemyPaths)-1; i++) {
-            //block off all parts of the path (except player location)
-            if(!enemyPaths[i].isValid()) { continue; }
-            for(int j = 0; j < enemyPaths[i].len-1; j++) {
-                assert(memcmp(&rgbAt(map,
-                    enemyPaths[i].points[j].x,
-                    enemyPaths[i].points[j].y
-                ), &white, sizeof(rgb)) == 0);
-                rgbAt(map, enemyPaths[i].points[j].x, enemyPaths[i].points[j].y) = black;
-            }
-            //check if the next path intersects
-            bool intersectsNextPath = false;
-            if(!enemyPaths[i+1].isValid()) {continue; }
-            for(int j = 0; j < enemyPaths[i+1].len; j++) {
-                if(memcmp(&rgbAt(map,
-                    enemyPaths[i+1].points[j].x,
-                    enemyPaths[i+1].points[j].y
-                ), &black, sizeof(rgb)) == 0) {
-                    intersectsNextPath = true;
-                    break;
-                }
-            }
-            //if it intersects, recalculate it, otherwise do nothing
-            if(intersectsNextPath) {
-                free(enemyPaths[i+1].points);
-                enemyPaths[i+1] = a_star(map, enemies[enemyIndxs[i+1]].pos, player1.pos, isNotWhite);
-            }
-        }
-        //remove blockage
-        for(int i = 0; i < arrlen(enemyPaths)-1; i++) {
-            if(!enemyPaths[i].isValid()) { continue; }
-            for(int j = 0; j < enemyPaths[i].len-1; j++) {
-                assert(memcmp(&rgbAt(map,
-                    enemyPaths[i].points[j].x,
-                    enemyPaths[i].points[j].y
-                ), &black, sizeof(rgb)) == 0);
-                rgbAt(map, enemyPaths[i].points[j].x, enemyPaths[i].points[j].y) = white;
-            }
-        }
-        */
+
         //move one step in the game
         if(IsKeyPressed(KEY_SPACE) || playerMoves >= moveThreshold) {
             //decay all walls
@@ -248,9 +216,9 @@ int main(void) {
                 const auto& secondNode = *std::prev(enemy.plannedPath.nodes.end(), 2);
                 assert(firstNode.pos == enemy.pos);
                 assert(taxicabDist(secondNode.pos, enemy.pos) == 1);
-                if(secondNode.weight == 1) {
+                //if(secondNode.weight == 1 || secondNode.weight == OVERLAP_MULTIPLIER) {
                     enemy.pos = secondNode.pos;
-                }
+                //}
             }
             playerMoves -= moveThreshold;
         }

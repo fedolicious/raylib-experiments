@@ -13,7 +13,6 @@ path::path(const AStarData& data, const AStarData::graph_type::node& lastNode): 
         node = prevNode;
     }
     this->nodes.emplace_back(node->pos, data.data_of(*node).g_val);
-    
 }
 
 template <typename GraphT>
@@ -23,7 +22,7 @@ a_star_data<GraphT>::node_data::node_data():
 {}
 template <typename GraphT>
 inline const a_star_data<GraphT>::graph_data a_star_data<GraphT>::graph_data_of(const GraphT::node& node) const {
-    return a_star_data<GraphT>::graph_data{node.data, this->data_of(node).g_val};
+    return a_star_data<GraphT>::graph_data{node.data, node.pos, this->data_of(node).g_val};
 }
 template <typename GraphT>
 inline const a_star_data<GraphT>::node_data& a_star_data<GraphT>::data_of(const GraphT::node& node) const {
@@ -91,6 +90,7 @@ path a_star(
                     aStarData.graph_data_of(*bestNode),
                     aStarData.graph_data_of(neighbor)
                 );
+            assert(contenderGVal >= aStarData.data_of(*bestNode).g_val);
             if(aStarData.data[i].g_val <= contenderGVal) {
                 continue;
             }
