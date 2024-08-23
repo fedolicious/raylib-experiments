@@ -12,7 +12,7 @@ public:
     class node {
     public:
         T data;
-        std::vector<typename decltype(graph<T>::nodes)::size_type> neighborIndices;
+        std::vector<std::size_t> neighborIndices;
         ivec2 pos;
         node() = delete;
         node(const ivec2, const T&&);

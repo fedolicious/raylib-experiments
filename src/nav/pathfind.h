@@ -8,7 +8,7 @@
 #include <cassert>
 #include <memory>
 
-class path {
+class path { //TODO nodes should contain references to the graph nodes instead of pos (optimization)
     class path_node {
     public: 
         ivec2 pos;

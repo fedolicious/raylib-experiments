@@ -1,10 +1,10 @@
 #pragma once
 
-#include <string.h>
-#include <assert.h>
+#include <cstring>
+#include <cassert>
+#include <functional>
 
 #define member(type, member) (((type *)0)->member)
-#define arrlen(arr) (sizeof(arr)/sizeof(arr[0]))
 
 struct ivec2 {
     int x;
@@ -12,6 +12,9 @@ struct ivec2 {
     bool operator==(const ivec2 other) const;
     bool operator!=(const ivec2 other) const;
     ivec2 operator+(const ivec2 other) const;
+};
+template<> struct std::hash<ivec2> {
+    std::size_t operator()(const ivec2& x) const;
 };
 
 void perrorExit(const char* msg, int errorValue);

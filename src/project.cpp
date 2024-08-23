@@ -26,6 +26,7 @@
 #include "imgio.h"
 #include "collections/graph.h"
 #include "nav/pathfind.h"
+#include "nav/world_map.h"
 
 #include <iostream>
 #include <filesystem>
@@ -76,6 +77,7 @@ bool isNotWhite(const rgb x) {
 int main(void) {
     const rgb white = (rgb){255,255,255};
     const rgb black = (rgb){0,0,0};
+    const rgb blue = (rgb){0, 0, 255};
     const int screenWidth = 1920;
     const int screenHeight = 1080;
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
@@ -85,6 +87,7 @@ int main(void) {
     std::filesystem::current_path("resources");
     
     image map = imgio_readPPM("donut.ppm");
+    world_map worldMap{map};
     int whiteCells = 0;
     for(unsigned i = 0; i < map.width*map.height; i++) {
         if(memcmp(&map.pixels[i], &white, sizeof(rgb)) == 0) {
@@ -134,7 +137,7 @@ int main(void) {
             IsKeyPressed(KEY_RIGHT) + IsKeyPressed(KEY_D)
             - IsKeyPressed(KEY_LEFT) - IsKeyPressed(KEY_A);
         if(taxicabDist(contenderPos, player1.pos) == 1) {
-            if(rgbAt(map, contenderPos.x, contenderPos.y) == white) {
+            if(rgbAt(map, contenderPos.x, contenderPos.y) != black) {
                 player1.pos = contenderPos;
                 playerMoves += 1;
             } else {
@@ -142,6 +145,7 @@ int main(void) {
             }
         }
         //place wall
+        /*
         if(energy >= wallCost && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             int rMouseX = (GetMouseX() - imgX);
             int rMouseY = (GetMouseY() - imgY);
@@ -154,10 +158,11 @@ int main(void) {
                 }
             }
         }
+        */
         class map_node {
         public:
             unsigned wall_health;
-            static unsigned map_nodes_weight(const struct a_star_data<graph<map_node> >::graph_data& a, const struct a_star_data<graph<map_node> >::graph_data& b) {
+            static unsigned weight(const struct a_star_data<graph<map_node>>::graph_data& a, const struct a_star_data<graph<map_node>>::graph_data& b) {
                 if(b.data.wall_health > a.g_val) {
                     return 1 + b.data.wall_health - a.g_val;
                 } else {
@@ -173,28 +178,103 @@ int main(void) {
 
         //ENEMY PATHING
         static_assert(enemies.size() == 2);
+        const auto& getIndx = [&](const ivec2 x){
+            const auto& nodes = worldMap.graph.nodes;
+            const auto nodeIter = find_if(nodes.begin(), nodes.end(), [&](auto& y){return y.pos == x;});
+            assert(nodeIter != nodes.end());
+            return static_cast<std::size_t>(nodeIter - nodes.begin());
+        };
+        const auto& getSubgraphIndx = [&](const ivec2 x){
+            return worldMap.graph.nodes[getIndx(x)].data.closest_subgraph_node_indx;
+        };
         //calculate each path to the player
         for(auto& enemy : enemies) { //TODO heuristic based on distance to other enemies
-            enemy.plannedPath = a_star(map_graph, enemy.pos, player1.pos, map_node::map_nodes_weight);
+            enemy.plannedPath = a_star(
+                worldMap.graph,
+                worldMap.graph.nodes.at(getSubgraphIndx(enemy.pos)).pos,
+                worldMap.graph.nodes.at(getSubgraphIndx(player1.pos)).pos,
+                [](const auto& a, const auto& b)->unsigned{
+                    return (a.data.in_subgraph && b.data.in_subgraph)? 1:UINT_MAX;
+                });
         }
-        const bool& firstEnemyCloser = enemies[0].plannedPath.length() < enemies[1].plannedPath.length();
-        const enemy& closeEnemy = firstEnemyCloser? enemies[0] : enemies[1];
-        enemy& farEnemy = firstEnemyCloser? enemies[1] : enemies[0];
-
-        #define OVERLAP_MULTIPLIER 100
-        farEnemy.plannedPath = a_star(map_graph, farEnemy.pos, player1.pos,
-            [&](const auto& a, const auto& b)->unsigned{
-                int distToCloseEnemy = a_star(map_graph, closeEnemy.pos, a.pos, map_node::map_nodes_weight).length();
-                int multiplier = OVERLAP_MULTIPLIER - distToCloseEnemy;
-                if(multiplier < 1) { multiplier = 1; }
-                if(distToCloseEnemy < closeEnemy.plannedPath.length()) {
-                    return map_node::map_nodes_weight(a,b)*multiplier;
-                } else {
-                    return map_node::map_nodes_weight(a,b);
-                }
+        std::sort(enemies.begin(), enemies.end(), [](const enemy& a, const enemy& b){
+            return a.plannedPath.length() < b.plannedPath.length();
+        });
+        //TODO deal with case where both enemies overlap
+        //block off all parts of path 0 (except end)
+        if(!enemies[0].plannedPath.isValid()) { continue; }
+        for(int j = 1; j < enemies[0].plannedPath.nodes.size(); j++) {
+            const auto graphNode = worldMap.nodeAt(enemies[0].plannedPath.nodes[j].pos);
+            assert(graphNode != worldMap.graph.nodes.end());
+            assert(graphNode->data.in_subgraph);
+            graphNode->data.wall = true;
+        }
+        //set mask for path 0
+        for(const auto& node : enemies[0].plannedPath.nodes) {
+            worldMap.nodeAt(node.pos)->data.enemy0_mask = true;
+        }
+        //check if the next path intersects
+        bool intersectsNextPath = false;
+        if(!enemies[1].plannedPath.isValid()) { continue; }
+        for(auto& node : enemies[1].plannedPath.nodes) {
+            const auto graphNode = worldMap.nodeAt(node.pos);
+            assert(graphNode != worldMap.graph.nodes.end());
+            if(graphNode->data.wall) {
+                intersectsNextPath = true;
+                break;
             }
-        );
-
+        }
+        //if it intersects, recalculate it
+        if(intersectsNextPath) {
+            enemies[1].plannedPath = a_star(
+                worldMap.graph,
+                worldMap.graph.nodes.at(getSubgraphIndx(enemies[1].pos)).pos,
+                worldMap.graph.nodes.at(getSubgraphIndx(player1.pos)).pos,
+                [](const auto& a, const auto& b)->unsigned{
+                    return (
+                        a.data.in_subgraph &&
+                        !a.data.wall &&
+                        b.data.in_subgraph &&
+                        !b.data.wall)? 1:UINT_MAX;
+                });
+        }
+        //set mask for path 1
+        for(const auto& node : enemies[1].plannedPath.nodes) {
+            worldMap.nodeAt(node.pos)->data.enemy1_mask = true;
+        }
+        //reset walls
+        for(int j = 1; j < enemies[0].plannedPath.nodes.size(); j++) {
+            const auto nodeInGraph = worldMap.nodeAt(enemies[0].plannedPath.nodes[j].pos);
+            assert(nodeInGraph != worldMap.graph.nodes.end());
+            assert(nodeInGraph->data.in_subgraph);
+            nodeInGraph->data.wall = false;
+        }
+        //repathfind with mask
+        enemies[0].plannedPath = a_star(
+            worldMap.graph,
+            worldMap.graph.nodes.at(getIndx(enemies[0].pos)).pos,
+            worldMap.graph.nodes.at(getIndx(player1.pos)).pos,
+            [&](const auto& a, const auto& b)->unsigned{
+                return (
+                    worldMap.graph.nodes[a.data.closest_subgraph_node_indx].data.enemy0_mask &&
+                    worldMap.graph.nodes[b.data.closest_subgraph_node_indx].data.enemy0_mask
+                )? 1:UINT_MAX;
+            });
+        enemies[1].plannedPath = a_star(
+            worldMap.graph,
+            worldMap.graph.nodes.at(getIndx(enemies[1].pos)).pos,
+            worldMap.graph.nodes.at(getIndx(player1.pos)).pos,
+            [&](const auto& a, const auto& b)->unsigned{
+                return (
+                    worldMap.graph.nodes[a.data.closest_subgraph_node_indx].data.enemy1_mask &&
+                    worldMap.graph.nodes[b.data.closest_subgraph_node_indx].data.enemy1_mask
+                )? 1:UINT_MAX;
+            });
+        //reset masks
+        for(auto& node : worldMap.graph.nodes) {
+            node.data.enemy0_mask = false;
+            node.data.enemy1_mask = false;
+        }
         //move one step in the game
         if(IsKeyPressed(KEY_SPACE) || playerMoves >= moveThreshold) {
             //decay all walls
@@ -216,9 +296,9 @@ int main(void) {
                 const auto& secondNode = *std::prev(enemy.plannedPath.nodes.end(), 2);
                 assert(firstNode.pos == enemy.pos);
                 assert(taxicabDist(secondNode.pos, enemy.pos) == 1);
-                //if(secondNode.weight == 1 || secondNode.weight == OVERLAP_MULTIPLIER) {
+                if(secondNode.weight == 1) {
                     enemy.pos = secondNode.pos;
-                //}
+                }
             }
             playerMoves -= moveThreshold;
         }
@@ -264,8 +344,29 @@ int main(void) {
             
             ClearBackground(RAYWHITE);
             DrawText("Congrats! You created your first window!", 190, 200, 20, LIGHTGRAY);
+
+            //draw map with subgraph visualization
+            
+            for(const auto& node : worldMap.graph.nodes) {
+                unsigned x = node.pos.x;
+                unsigned y = node.pos.y;
+                rgb pxl = rgbAt(map, x, y);
+                DrawRectangle(
+                    imgX + pxSize*x,
+                    imgY + pxSize*y,
+                    pxSize, pxSize,
+                    Color{
+                        //0,0,
+                        200,
+                        (unsigned char)((node.data.closest_subgraph_node_indx%7)*10+190),
+                        //(unsigned char)(worldMap.graph.nodes[node.data.closest_subgraph_node_indx].data.enemy1_mask? 255:0),
+                        (unsigned char)(node.data.in_subgraph? 255:0),
+                        255
+                    });
+            }
             
             //draw map
+            /*
             for(unsigned y = 0; y < map.height; y++)
             for(unsigned x = 0; x < map.width; x++) {
                 rgb pxl = rgbAt(map, x, y);
@@ -275,6 +376,7 @@ int main(void) {
                     pxSize, pxSize,
                 CLITERAL(Color){ pxl.r, pxl.g, pxl.b, 255 });
             }
+            */
             //draw player
             DrawEllipse(
                 imgX + pxSize*player1.pos.x + pxSize/2,
@@ -283,6 +385,13 @@ int main(void) {
                 pxSize/2,
                 GREEN
             );
+            //draw player subgraph location
+            {
+                const ivec2 subgraphPos = worldMap.graph.nodes.at(getSubgraphIndx(player1.pos)).pos;
+                const int playerX = imgX+pxSize*subgraphPos.x+pxSize/2;
+                const int playerY = imgY+pxSize*subgraphPos.y+pxSize/2;
+                DrawEllipse(playerX, playerY, pxSize/2, pxSize/2, Color{0, 255, 0, 150});
+            }
             //draw coin
             DrawEllipse(
                 imgX + pxSize*coin.pos.x + pxSize/2,
@@ -297,11 +406,17 @@ int main(void) {
                 int enemyY = imgY + pxSize*enemy.pos.y + pxSize/2;
                 DrawEllipse(enemyX, enemyY, pxSize/2, pxSize/2, RED);
                 DrawText(TextFormat("%d", enemy.stunTimer), enemyX-10, enemyY-10, 20, WHITE);
+
+            //draw enemy subgraph location
+                const ivec2 subgraphPos = worldMap.graph.nodes.at(getSubgraphIndx(enemy.pos)).pos;
+                enemyX = imgX + pxSize*subgraphPos.x + pxSize/2;
+                enemyY = imgY + pxSize*subgraphPos.y + pxSize/2;
+                DrawEllipse(enemyX, enemyY, pxSize/2, pxSize/2, Color{255,0,0,50});
             }
             //draw paths
             for(const auto& enemy : enemies) {
-                // const auto& enemy = enemies[0];
                 const auto& nodes = enemy.plannedPath.nodes;
+                if(nodes.empty()) { continue; }
                 for(auto it = nodes.begin(); it != std::prev(nodes.end()); it++) {
                     const auto it2 = it+1;
                     DrawLine(

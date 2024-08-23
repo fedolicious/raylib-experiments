@@ -90,8 +90,7 @@ path a_star(
                     aStarData.graph_data_of(*bestNode),
                     aStarData.graph_data_of(neighbor)
                 );
-            assert(contenderGVal >= aStarData.data_of(*bestNode).g_val);
-            if(aStarData.data[i].g_val <= contenderGVal) {
+            if(aStarData.data[i].g_val <= contenderGVal || contenderGVal < aStarData.data_of(*bestNode).g_val) {
                 continue;
             }
             aStarData.data[i].g_val = contenderGVal;
